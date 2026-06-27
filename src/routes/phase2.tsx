@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { Circle, FileEdit, CheckCircle2, Loader2, FileText, Users, ArrowRight, ArrowLeft, Sparkles, X } from "lucide-react";
 
-import { useState} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 
@@ -28,6 +28,7 @@ import { z } from "zod";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { canStartPhase2Review } from "@/lib/phase2-access";
+import { clearEvaluationDraft, getEvaluationDraftKey, loadEvaluationDraft, saveEvaluationDraft } from "@/lib/evaluation-draft";
 
 
 
@@ -164,6 +165,13 @@ function Phase2Page() {
 
 
 
+  const draftKey = useMemo(() => getEvaluationDraftKey({
+    phase: "phase2",
+    positionId: activePosition?.id,
+    interviewerId: profile?.uid,
+    candidateId: candidate?.id,
+  }), [activePosition?.id, candidate?.id, profile?.uid]);
+
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
   const [active, setActive] = useState(1);
@@ -172,6 +180,59 @@ function Phase2Page() {
   const [questionScores, setQuestionScores] = useState<Record<string, { criteria: Record<string, number>; notes: string }>>({});
   const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward' | null>(null);
   const [showCandidatePicker, setShowCandidatePicker] = useState(false);
+
+  useEffect(() => {
+    if (!candidate) {
+      setNotes("");
+      setRatings({});
+      setQuestionScores({});
+      setActive(1);
+      setAnimationDirection(null);
+      setActiveTab("review");
+      return;
+    }
+
+    if (!draftKey) {
+      setNotes("");
+      setRatings({});
+      setQuestionScores({});
+      setActive(1);
+      setAnimationDirection(null);
+      setActiveTab("score");
+      return;
+    }
+
+    const draft = loadEvaluationDraft(draftKey);
+    if (draft) {
+      setNotes(draft.notes ?? "");
+      setRatings(draft.ratings ?? {});
+      setQuestionScores(draft.questionScores ?? {});
+      setActive(draft.activeQuestion ?? 1);
+      setActiveTab((draft.activeTab as "score" | "questions" | "review") ?? "score");
+      return;
+    }
+
+    setNotes("");
+    setRatings({});
+    setQuestionScores({});
+    setActive(1);
+    setAnimationDirection(null);
+    setActiveTab("score");
+  }, [candidate?.id, draftKey]);
+
+  useEffect(() => {
+    if (!draftKey || !candidate) return;
+
+    const payload = {
+      notes,
+      ratings,
+      questionScores,
+      activeQuestion: active,
+      activeTab,
+      updatedAt: Date.now(),
+    };
+    saveEvaluationDraft(draftKey, payload);
+  }, [active, activeTab, candidate?.id, draftKey, notes, questionScores, ratings]);
 
   
 
@@ -335,8 +396,6 @@ function Phase2Page() {
     setSubmissionProgress("Creating evaluation...");
 
     try {
-
-      // Create evaluation record
       const evaluation = await createEvaluation({
         candidateId: candidate.id,
         positionId: activePosition?.id || "",
@@ -345,13 +404,10 @@ function Phase2Page() {
         phase: "phase2",
       });
 
-      // Save all question scores
       const totalQuestions = Object.keys(questionScores).length;
-      let currentQuestion = 0;
-      for (const [questionId, scoreData] of Object.entries(questionScores)) {
-        currentQuestion++;
-        setSubmissionProgress(`Saving question ${currentQuestion} of ${totalQuestions}...`);
-        const questionIndex = phase2Questions.findIndex(q => q.id === questionId);
+      const submissions = Object.entries(questionScores).map(async ([questionId, scoreData], index) => {
+        setSubmissionProgress(`Saving question ${index + 1} of ${totalQuestions}...`);
+        const questionIndex = phase2Questions.findIndex((q) => q.id === questionId);
         await saveQuestionEvaluation(evaluation.id, questionId, {
           questionId,
           criteria: {
@@ -359,7 +415,9 @@ function Phase2Page() {
             notes: scoreData.notes,
           },
         }, questionIndex >= 0 ? questionIndex : 0);
-      }
+      });
+
+      await Promise.all(submissions);
 
       setSubmissionProgress("Completing evaluation...");
       // Mark evaluation as complete
@@ -383,6 +441,8 @@ function Phase2Page() {
       if (!nextCandidate) {
         nextCandidate = eligibleCandidates.find((c) => !c.phase2Complete && c.id !== candidate.id);
       }
+
+      if (draftKey) clearEvaluationDraft(draftKey);
 
       if (nextCandidate) {
         toast.success("Evaluation complete. Moving to the next candidate.");

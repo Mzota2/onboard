@@ -2,9 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { AppShell, ScoreBlocks } from "@/components/AppShell";
 import { PortraitSilhouette } from "@/components/PortraitSilhouette";
+import { ResultExportActions } from "@/components/ResultExportActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getCandidate } from "@/lib/firebase/candidates";
+import { listEvaluations } from "@/lib/firebase/evaluations";
 import { usePositions } from "@/hooks/use-vetting-data";
 import { requireAuth } from "@/lib/route-guards";
 
@@ -30,6 +32,12 @@ function EvalPage() {
   const { data: candidate, isLoading } = useQuery({
     queryKey: ["candidate", id],
     queryFn: () => getCandidate(id),
+  });
+
+  const { data: evaluations = [] } = useQuery({
+    queryKey: ["evaluations", id],
+    queryFn: () => listEvaluations(id),
+    enabled: !!id,
   });
 
   const canView =
@@ -116,6 +124,15 @@ function EvalPage() {
           </div>
         )}
       </article>
+
+      <ResultExportActions
+        candidate={candidate}
+        position={activePosition}
+        phase="final"
+        averageScore={finalScore}
+        interviewCount={evaluations.filter((evaluation) => evaluation.isComplete).length}
+        phaseScores={{ phase1: p1, phase2: p2 }}
+      />
 
       <Link to="/candidate" className="mt-5 block border-2 border-ink bg-ink py-4 text-center font-mono text-[11px] uppercase tracking-widest text-surface bp-press">
         Back to Candidates

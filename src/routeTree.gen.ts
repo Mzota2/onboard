@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransitionRouteImport } from './routes/transition'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResultsRouteImport } from './routes/results'
 import { Route as Phase2RouteImport } from './routes/phase2'
 import { Route as Phase1RouteImport } from './routes/phase1'
 import { Route as LoginRouteImport } from './routes/login'
@@ -35,6 +36,11 @@ const SignupRoute = SignupRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResultsRoute = ResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Phase2Route = Phase2RouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/phase1': typeof Phase1Route
   '/phase2': typeof Phase2Route
+  '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transition': typeof TransitionRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/phase1': typeof Phase1Route
   '/phase2': typeof Phase2Route
+  '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transition': typeof TransitionRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/phase1': typeof Phase1Route
   '/phase2': typeof Phase2Route
+  '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transition': typeof TransitionRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/phase1'
     | '/phase2'
+    | '/results'
     | '/settings'
     | '/signup'
     | '/transition'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/phase1'
     | '/phase2'
+    | '/results'
     | '/settings'
     | '/signup'
     | '/transition'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/phase1'
     | '/phase2'
+    | '/results'
     | '/settings'
     | '/signup'
     | '/transition'
@@ -178,6 +190,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   Phase1Route: typeof Phase1Route
   Phase2Route: typeof Phase2Route
+  ResultsRoute: typeof ResultsRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   TransitionRoute: typeof TransitionRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/results': {
+      id: '/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof ResultsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/phase2': {
@@ -282,6 +302,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   Phase1Route: Phase1Route,
   Phase2Route: Phase2Route,
+  ResultsRoute: ResultsRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   TransitionRoute: TransitionRoute,

@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, Zap, ChevronLeft, ChevronRight, Clock, Loader2, ChevronDown, ChevronUp, Filter, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, Toggle } from "@/components/AppShell";
 import { AdminCandidateActions } from "@/components/admin/AdminPipelinePanel";
-import { PortraitSilhouette } from "@/components/PortraitSilhouette";import { useAuth } from "@/contexts/AuthContext";
+import { PortraitSilhouette } from "@/components/PortraitSilhouette";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCandidates, usePositions } from "@/hooks/use-vetting-data";
 import { updatePositionPromotionSettings } from "@/lib/firebase/positions";
 import { autoPromoteTopCandidates } from "@/lib/firebase/candidates";
@@ -14,9 +15,15 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { listEvaluations } from "@/lib/firebase/evaluations";
 import { canStartPhase2Review } from "@/lib/phase2-access";
+import { z } from "zod";
+
+const candidateSearchSchema = z.object({
+  filter: z.enum(["all", "evaluated", "phase2", "disqualified", "pending"]).optional(),
+});
 
 export const Route = createFileRoute("/candidate")({
   beforeLoad: requireAuth,
+  validateSearch: candidateSearchSchema,
   head: () => ({
     meta: [
       { title: "Candidates · onboard" },
@@ -30,10 +37,19 @@ function CandidatesPage() {
   const { isAdmin } = useAuth();
   const { data: positions = [] } = usePositions();
   const activePosition = positions[0];
+  const { filter: queryFilter } = Route.useSearch();
   const { data: candidates = [], isLoading } = useCandidates(activePosition?.id);
   const queryClient = useQueryClient();
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "evaluated" | "phase2" | "disqualified" | "pending">("all");
+  const [filter, setFilter] = useState<"all" | "evaluated" | "phase2" | "disqualified" | "pending">(
+    queryFilter ?? "all",
+  );
+
+  useEffect(() => {
+    if (queryFilter) {
+      setFilter(queryFilter);
+    }
+  }, [queryFilter]);
 
   const toggleAutoSelect = async () => {
     if (!activePosition || !isAdmin) return;

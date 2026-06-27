@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ShieldCheck, Loader2, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PortraitSilhouette } from "@/components/PortraitSilhouette";
+import { ResultExportActions } from "@/components/ResultExportActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getCandidate } from "@/lib/firebase/candidates";
@@ -216,6 +217,15 @@ function Phase2EvalPage() {
           </div>
         )}
       </article>
+
+      <ResultExportActions
+        candidate={candidate}
+        position={activePosition}
+        phase="phase2"
+        averageScore={averageScore}
+        interviewCount={completedEvaluations.length}
+        phaseScores={{ phase2: averageScore }}
+      />
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <Link to="/phase2" search={{ candidateId: candidate.id }} className="border-2 border-ink py-4 text-center font-mono text-[11px] uppercase tracking-widest bp-press">

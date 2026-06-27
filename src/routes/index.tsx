@@ -72,6 +72,45 @@ function PipelinePage() {
         <p className="bp-meta capitalize">{profile?.role} · {activePosition?.code ?? "No active position"}</p>
       </div>
 
+      {activePosition && (
+        <section className="mb-6 bp-fade-up">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="bp-label">Released results</p>
+              <p className="bp-meta mt-2">Quick access to published phase result archives.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {activePosition.phase1ConsentReleased || isAdmin ? (
+                <Link
+                  to="/results"
+                  search={{ phase: "phase1" }}
+                  className="inline-flex items-center justify-center gap-2 rounded border-2 border-ink bg-ink px-4 py-3 text-[11px] uppercase tracking-widest text-surface bp-press"
+                >
+                  Phase 1 Results
+                </Link>
+              ) : (
+                <div className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded border-2 border-ink/40 bg-surface px-4 py-3 text-[11px] uppercase tracking-widest text-muted-foreground">
+                  Phase 1 Results
+                </div>
+              )}
+              {activePosition.phase2ConsentReleased || isAdmin ? (
+                <Link
+                  to="/results"
+                  search={{ phase: "phase2" }}
+                  className="inline-flex items-center justify-center gap-2 rounded border-2 border-ink bg-ink px-4 py-3 text-[11px] uppercase tracking-widest text-surface bp-press"
+                >
+                  Phase 2 Results
+                </Link>
+              ) : (
+                <div className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded border-2 border-ink/40 bg-surface px-4 py-3 text-[11px] uppercase tracking-widest text-muted-foreground">
+                  Phase 2 Results
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="bp-fade-up relative mb-6">
         <div className="absolute -right-1 top-2 bottom-2 left-2 border-2 border-ink bg-surface-dim" aria-hidden />
         <div className="bp-card relative p-5 shadow-[6px_6px_0_0_var(--ink)]">

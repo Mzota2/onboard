@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 
 import { Clock, Braces, Compass, ArrowRight, ArrowLeft, Loader2, UserPlus, FileText, Users, Sparkles, X } from "lucide-react";
 
-import { useState} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 
@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { clearEvaluationDraft, getEvaluationDraftKey, loadEvaluationDraft, saveEvaluationDraft } from "@/lib/evaluation-draft";
 
 
 
@@ -132,8 +133,14 @@ function Phase1Page() {
 
   const [currentRole, setCurrentRole] = useState("");
 
-  const [notes, setNotes] = useState("");
+  const draftKey = useMemo(() => getEvaluationDraftKey({
+    phase: "phase1",
+    positionId: activePosition?.id,
+    interviewerId: profile?.uid,
+    candidateId: candidate?.id,
+  }), [activePosition?.id, candidate?.id, profile?.uid]);
 
+  const [notes, setNotes] = useState("");
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -141,6 +148,59 @@ function Phase1Page() {
   const [questionScores, setQuestionScores] = useState<Record<string, { criteria: Record<string, number>; notes: string }>>({});
   const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward' | null>(null);
   const [showCandidatePicker, setShowCandidatePicker] = useState(false);
+
+  useEffect(() => {
+    if (!candidate) {
+      setNotes("");
+      setRatings({});
+      setQuestionScores({});
+      setActiveQuestion(1);
+      setAnimationDirection(null);
+      setActiveTab("add");
+      return;
+    }
+
+    if (!draftKey) {
+      setNotes("");
+      setRatings({});
+      setQuestionScores({});
+      setActiveQuestion(1);
+      setAnimationDirection(null);
+      setActiveTab("score");
+      return;
+    }
+
+    const draft = loadEvaluationDraft(draftKey);
+    if (draft) {
+      setNotes(draft.notes ?? "");
+      setRatings(draft.ratings ?? {});
+      setQuestionScores(draft.questionScores ?? {});
+      setActiveQuestion(draft.activeQuestion ?? 1);
+      setActiveTab((draft.activeTab as "add" | "score" | "questions" | "review") ?? "score");
+      return;
+    }
+
+    setNotes("");
+    setRatings({});
+    setQuestionScores({});
+    setActiveQuestion(1);
+    setAnimationDirection(null);
+    setActiveTab("score");
+  }, [candidate?.id, draftKey]);
+
+  useEffect(() => {
+    if (!draftKey || !candidate) return;
+
+    const payload = {
+      notes,
+      ratings,
+      questionScores,
+      activeQuestion,
+      activeTab,
+      updatedAt: Date.now(),
+    };
+    saveEvaluationDraft(draftKey, payload);
+  }, [activeQuestion, activeTab, candidate?.id, draftKey, notes, questionScores, ratings]);
 
 
 
@@ -335,7 +395,6 @@ function Phase1Page() {
     setSubmitting(true);
     setSubmissionProgress("Creating evaluation...");
     try {
-      // Create evaluation record
       const evaluation = await createEvaluation({
         candidateId: candidate.id,
         positionId: activePosition?.id || "",
@@ -344,13 +403,10 @@ function Phase1Page() {
         phase: "phase1",
       });
 
-      // Save all question scores
       const totalQuestions = Object.keys(questionScores).length;
-      let currentQuestion = 0;
-      for (const [questionId, scoreData] of Object.entries(questionScores)) {
-        currentQuestion++;
-        setSubmissionProgress(`Saving question ${currentQuestion} of ${totalQuestions}...`);
-        const questionIndex = phase1Questions.findIndex(q => q.id === questionId);
+      const submissions = Object.entries(questionScores).map(async ([questionId, scoreData], index) => {
+        setSubmissionProgress(`Saving question ${index + 1} of ${totalQuestions}...`);
+        const questionIndex = phase1Questions.findIndex((q) => q.id === questionId);
         await saveQuestionEvaluation(evaluation.id, questionId, {
           questionId,
           criteria: {
@@ -358,7 +414,9 @@ function Phase1Page() {
             notes: scoreData.notes,
           },
         }, questionIndex >= 0 ? questionIndex : 0);
-      }
+      });
+
+      await Promise.all(submissions);
 
       setSubmissionProgress("Completing evaluation...");
       // Mark evaluation as complete
@@ -382,6 +440,8 @@ function Phase1Page() {
       if (!nextCandidate) {
         nextCandidate = eligibleCandidates.find((c) => !c.phase1Complete && c.id !== candidate.id);
       }
+
+      if (draftKey) clearEvaluationDraft(draftKey);
 
       if (nextCandidate) {
         toast.success("Evaluation complete. Moving to the next candidate.");
