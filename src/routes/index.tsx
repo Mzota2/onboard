@@ -6,7 +6,9 @@ import { usePipelineStats, usePositions } from "@/hooks/use-vetting-data";
 import { updatePositionConsent } from "@/lib/firebase/positions";
 import { requireAuth } from "@/lib/route-guards";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { getPhaseReleaseReadiness } from "@/lib/firebase/admin";
 
 export const Route = createFileRoute("/")({
   beforeLoad: requireAuth,
@@ -25,9 +27,19 @@ function PipelinePage() {
   const { data: stats, isLoading: statsLoading } = usePipelineStats();
   const queryClient = useQueryClient();
   const activePosition = positions[0];
+  const [releaseSummary, setReleaseSummary] = useState<{ phase1: any; phase2: any }>({ phase1: null, phase2: null });
 
   const toggleConsent = async (field: "phase1ConsentReleased" | "phase2ConsentReleased", value: boolean) => {
     if (!isAdmin || !activePosition) return;
+
+    if (value) {
+      const summary = await getPhaseReleaseReadiness(activePosition.id, field);
+      if (!summary.canRelease) {
+        toast.error(summary.reason);
+        return;
+      }
+    }
+
     try {
       await updatePositionConsent(activePosition.id, field, value);
       await queryClient.invalidateQueries({ queryKey: ["positions"] });
@@ -36,6 +48,19 @@ function PipelinePage() {
       toast.error("Failed to update consent gate");
     }
   };
+
+  useEffect(() => {
+    const loadReadiness = async () => {
+      if (!activePosition || !isAdmin) return;
+      const [phase1, phase2] = await Promise.all([
+        getPhaseReleaseReadiness(activePosition.id, "phase1ConsentReleased"),
+        getPhaseReleaseReadiness(activePosition.id, "phase2ConsentReleased"),
+      ]);
+      setReleaseSummary({ phase1, phase2 });
+    };
+
+    loadReadiness();
+  }, [activePosition?.id, isAdmin]);
 
   const loading = positionsLoading || statsLoading;
 
@@ -87,6 +112,22 @@ function PipelinePage() {
 
       <section className="bp-card mb-6 p-5">
         <SystemIllustration />
+        {isAdmin && activePosition && (
+          <div className="mt-4 grid gap-2 border-t-2 border-dashed border-ink/40 pt-3 text-[12px]">
+            <div className="flex items-center justify-between">
+              <span className="bp-meta">Phase 1 release readiness</span>
+              <span className={releaseSummary.phase1?.canRelease ? "text-ink" : "text-alert"}>
+                {releaseSummary.phase1?.completedInterviewerCount ?? 0}/{releaseSummary.phase1?.requiredInterviewerCount ?? 0} complete
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="bp-meta">Phase 2 release readiness</span>
+              <span className={releaseSummary.phase2?.canRelease ? "text-ink" : "text-alert"}>
+                {releaseSummary.phase2?.completedInterviewerCount ?? 0}/{releaseSummary.phase2?.requiredInterviewerCount ?? 0} complete
+              </span>
+            </div>
+          </div>
+        )}
         <div className="mt-3 text-center">
           <p className="bp-meta">
             ACTIVE POSITIONS: <span className="font-bold text-ink">{positions.length}</span>

@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { KeyRound, Bell, Users, LogOut, ShieldCheck, Trash2, RotateCcw, FileStack } from "lucide-react";
-import { useState } from "react";
+import { KeyRound, Bell, Users, LogOut, ShieldCheck, Trash2, RotateCcw, FileStack, Crown } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AppShell, Toggle } from "@/components/AppShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/lib/firebase/auth-service";
-import { deleteAllEvaluations, resetAppDataExceptUsers, clearAllPositionScenariosAndQuestions } from "@/lib/firebase/admin";
-import { updateUserSettings } from "@/lib/firebase/users";
+import { deleteAllEvaluations, resetAppDataExceptUsers, clearAllPositionScenariosAndQuestions, getInterviewerProgress } from "@/lib/firebase/admin";
+import { listUsers, updateUserRole, updateUserSettings } from "@/lib/firebase/users";
 import { requireAuth } from "@/lib/route-guards";
 import { toast } from "sonner";
 
@@ -25,6 +25,16 @@ function SettingsPage() {
   const { profile, isAdmin, refreshProfile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [adminBusy, setAdminBusy] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    Promise.all([listUsers(), getInterviewerProgress()])
+      .then(([allUsers, interviewerProgress]) => {
+        setUsers(interviewerProgress.length > 0 ? interviewerProgress : allUsers);
+      })
+      .catch(() => setUsers([]));
+  }, [isAdmin]);
 
   if (!profile) return null;
 
@@ -59,6 +69,16 @@ function SettingsPage() {
       toast.error("Administrative action failed");
     } finally {
       setAdminBusy(false);
+    }
+  };
+
+  const handlePromoteToAdmin = async (uid: string) => {
+    try {
+      await updateUserRole(uid, "admin");
+      setUsers((current) => current.map((user) => user.uid === uid ? { ...user, role: "admin" } : user));
+      toast.success("User promoted to admin");
+    } catch {
+      toast.error("Failed to update role");
     }
   };
 
@@ -133,6 +153,33 @@ function SettingsPage() {
       {isAdmin && (
         <section className="bp-card mt-5 p-5">
           <p className="bp-label">Admin Controls</p>
+          <div className="mt-4 space-y-2">
+            <p className="bp-label">Interviewers</p>
+            {users.length === 0 ? (
+              <p className="bp-meta">No interviewer accounts found.</p>
+            ) : (
+              users.map((user) => (
+                <div key={user.uid} className="flex flex-col gap-2 border-2 border-ink px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-display text-sm font-bold">{user.displayName || user.email}</p>
+                    <p className="bp-meta capitalize">{user.role}</p>
+                    <p className="bp-meta">
+                      Phase 1: {user.phase1Completed ?? 0} complete · Phase 2: {user.phase2Completed ?? 0} complete
+                    </p>
+                  </div>
+                  {user.role !== "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => handlePromoteToAdmin(user.uid)}
+                      className="flex items-center gap-2 border-2 border-ink px-2 py-1 font-mono text-[10px] uppercase tracking-widest bp-press"
+                    >
+                      <Crown className="h-3 w-3" /> Make Admin
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
           <p className="mt-1 bp-meta">Use these with care. They remove data from Firestore immediately.</p>
           <div className="mt-3 grid gap-2">
             <button

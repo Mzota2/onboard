@@ -1,6 +1,8 @@
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   serverTimestamp,
@@ -66,11 +68,25 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   return mapUser(snap.id, snap.data());
 }
 
+export async function listUsers(): Promise<UserProfile[]> {
+  if (!db) return [];
+  const snap = await getDocs(collection(db, COLLECTION));
+  return snap.docs.map((d) => mapUser(d.id, d.data()));
+}
+
 export async function updateUserSettings(uid: string, settings: Partial<UserSettings>): Promise<void> {
   if (!db) throw new Error("Firebase is not configured.");
   const current = await getUserProfile(uid);
   await updateDoc(doc(db, COLLECTION, uid), {
     settings: { ...current?.settings, vettingAlerts: true, autoLock: false, ...settings },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateUserRole(uid: string, role: UserRole): Promise<void> {
+  if (!db) throw new Error("Firebase is not configured.");
+  await updateDoc(doc(db, COLLECTION, uid), {
+    role,
     updatedAt: serverTimestamp(),
   });
 }
