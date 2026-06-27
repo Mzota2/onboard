@@ -568,7 +568,7 @@ function Phase1Page() {
 
                     </div>
 
-                    <div className={`grid gap-2 grid-cols-${c.scale}`}>
+                    <div className={`grid gap-2 grid-cols-5`}>
 
                       {Array.from({ length: c.scale || 5 }, (_, i) => i + 1).map((n) => (
 
