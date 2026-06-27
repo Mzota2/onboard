@@ -8,7 +8,6 @@ import {
   query,
   updateDoc,
   where,
-  orderBy,
   serverTimestamp,
   type DocumentData,
 } from "firebase/firestore";
@@ -38,18 +37,14 @@ function mapEvaluation(id: string, data: DocumentData): Evaluation {
 export async function listEvaluations(candidateId?: string, phase?: "phase1" | "phase2"): Promise<Evaluation[]> {
   if (!db) return [];
 
-  let q = query(collection(db, COLLECTION), orderBy("updatedAt", "desc"));
-  
-  if (candidateId) {
-    q = query(collection(db, COLLECTION), where("candidateId", "==", candidateId), orderBy("updatedAt", "desc"));
-  }
-  
-  if (phase) {
-    q = query(collection(db, COLLECTION), where("phase", "==", phase), orderBy("updatedAt", "desc"));
-  }
+  let q = query(collection(db, COLLECTION));
 
   if (candidateId && phase) {
-    q = query(collection(db, COLLECTION), where("candidateId", "==", candidateId), where("phase", "==", phase), orderBy("updatedAt", "desc"));
+    q = query(collection(db, COLLECTION), where("candidateId", "==", candidateId), where("phase", "==", phase));
+  } else if (candidateId) {
+    q = query(collection(db, COLLECTION), where("candidateId", "==", candidateId));
+  } else if (phase) {
+    q = query(collection(db, COLLECTION), where("phase", "==", phase));
   }
 
   const snap = await getDocs(q);

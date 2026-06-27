@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 
-import { Clock, Braces, Compass, ArrowRight, ArrowLeft, Loader2, UserPlus, FileText, Users } from "lucide-react";
+import { Clock, Braces, Compass, ArrowRight, ArrowLeft, Loader2, UserPlus, FileText, Users, Sparkles, X } from "lucide-react";
 
 import { useState} from "react";
 
@@ -74,7 +74,11 @@ function Phase1Page() {
 
   const { data: candidates = [] } = useCandidates(activePosition?.id);
 
-  const candidate = candidates.find((c) => c.id === candidateId);
+  const eligibleCandidates = [...candidates]
+    .filter((candidateItem) => !candidateItem.disqualified)
+    .sort((a, b) => a.rank - b.rank || b.aggregateScore - a.aggregateScore);
+
+  const candidate = eligibleCandidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.id === candidateId);
 
   // Prevent evaluation of disqualified candidates
   if (candidate?.disqualified) {
@@ -136,6 +140,7 @@ function Phase1Page() {
   const [submissionProgress, setSubmissionProgress] = useState<string>("");
   const [questionScores, setQuestionScores] = useState<Record<string, { criteria: Record<string, number>; notes: string }>>({});
   const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward' | null>(null);
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false);
 
 
 
@@ -246,6 +251,24 @@ function Phase1Page() {
   //   }
   // };
 
+  const startEvaluation = () => {
+    if (!activePosition) return;
+    const firstCandidate = eligibleCandidates[0];
+    if (!firstCandidate) {
+      toast.error("No candidates are ready yet. Add one first.");
+      return;
+    }
+
+    navigate({ to: "/phase1", search: { positionId: activePosition.id, candidateId: firstCandidate.id } });
+    setShowCandidatePicker(false);
+  };
+
+  const pickCandidate = (nextCandidateId: string) => {
+    if (!activePosition) return;
+    navigate({ to: "/phase1", search: { positionId: activePosition.id, candidateId: nextCandidateId } });
+    setShowCandidatePicker(false);
+  };
+
   const handleAddCandidate = async () => {
 
     if (!activePosition || !name.trim() || !code.trim()) {
@@ -349,8 +372,24 @@ function Phase1Page() {
       await queryClient.invalidateQueries({ queryKey: ["candidates"] });
       await queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
 
-      toast.success("Phase 1 evaluation submitted");
-      navigate({ to: "/evaluation/phase1/$id", params: { id: candidate.id } });
+      // Find the next candidate (in ranked order) who has NOT completed phase 1
+      const currentIndex = eligibleCandidates.findIndex((c) => c.id === candidate.id);
+      let nextCandidate;
+      if (currentIndex >= 0) {
+        nextCandidate = eligibleCandidates.slice(currentIndex + 1).find((c) => !c.phase1Complete);
+      }
+      // Fallback: search the whole list for any unevaluated candidate
+      if (!nextCandidate) {
+        nextCandidate = eligibleCandidates.find((c) => !c.phase1Complete && c.id !== candidate.id);
+      }
+
+      if (nextCandidate) {
+        toast.success("Evaluation complete. Moving to the next candidate.");
+        navigate({ to: "/phase1", search: { positionId: activePosition?.id, candidateId: nextCandidate.id } });
+      } else {
+        toast.success("Phase 1 evaluation submitted");
+        navigate({ to: "/candidate" });
+      }
     } catch (error: any){
       console.log(error)
       toast.error("Failed to save scores");
@@ -382,13 +421,98 @@ function Phase1Page() {
 
 
 
+  if (!candidate) {
+    return (
+      <AppShell>
+        <div className="bp-fade-up bp-card p-6 animate-fade-in-up">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+            <Sparkles className="h-3 w-3" /> Streamlined review flow
+          </div>
+          <h1 className="mt-3 font-display text-[32px] leading-[0.95] font-extrabold uppercase">Start Phase 01</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            One tap begins the evaluation for the first candidate. After each submission, the next candidate is loaded automatically.
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={startEvaluation}
+              className="flex items-center gap-2 border-2 border-ink bg-ink px-4 py-3 text-surface font-mono text-[11px] uppercase tracking-widest bp-press animate-glow-pulse"
+            >
+              <Sparkles className="h-4 w-4" /> Start Evaluation
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCandidatePicker(true)}
+              className="flex items-center gap-2 border-2 border-ink bg-surface px-4 py-3 font-mono text-[11px] uppercase tracking-widest bp-press"
+            >
+              <Users className="h-4 w-4" /> Choose Candidate
+            </button>
+          </div>
+
+          <div className="mt-5 border-2 border-dashed border-ink/40 p-4">
+            <p className="bp-meta">Candidates ready</p>
+            <p className="mt-1 font-display text-xl font-bold">{eligibleCandidates.length}</p>
+            {eligibleCandidates[0] ? (
+              <p className="mt-2 text-sm text-muted-foreground">First up: {eligibleCandidates[0].name}</p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Add a candidate to begin the flow.</p>
+            )}
+          </div>
+        </div>
+
+        {showCandidatePicker && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
+            <div className="w-full max-w-xl rounded-none border-2 border-ink bg-surface p-4 shadow-blueprint-lg animate-panel-in">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="bp-label">Candidate picker</p>
+                  <p className="bp-meta">Choose who to evaluate next</p>
+                </div>
+                <button type="button" onClick={() => setShowCandidatePicker(false)} className="border-2 border-ink p-2 bp-press">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-[60vh] space-y-2 overflow-auto">
+                {eligibleCandidates.map((candidateItem, index) => (
+                  <button
+                    key={candidateItem.id}
+                    type="button"
+                    onClick={() => pickCandidate(candidateItem.id)}
+                    className="flex w-full items-center justify-between border-2 border-ink bg-surface-dim px-3 py-3 text-left bp-press animate-fade-in-up"
+                    style={{ animationDelay: `${index * 40}ms` }}
+                  >
+                    <span>
+                      <span className="block font-display font-bold">{candidateItem.name}</span>
+                      <span className="bp-meta">{candidateItem.code}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </AppShell>
+    );
+  }
+
   return (
 
     <AppShell>
 
       <div className="bp-fade-up">
 
-        <p className="bp-meta flex items-center gap-2"><Compass className="h-3 w-3" /> {activePosition.code}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="bp-meta flex items-center gap-2"><Compass className="h-3 w-3" /> {activePosition.code}</p>
+          <button
+            type="button"
+            onClick={() => setShowCandidatePicker(true)}
+            className="flex items-center gap-2 border-2 border-ink bg-surface px-3 py-2 font-mono text-[11px] uppercase tracking-widest bp-press animate-soft-pop"
+          >
+            <Users className="h-3 w-3" /> Candidates
+          </button>
+        </div>
 
         <h1 className="mt-2 font-display text-[34px] leading-[0.95] font-extrabold tracking-tight uppercase">
 
@@ -406,7 +530,38 @@ function Phase1Page() {
 
       </div>
 
-
+      {showCandidatePicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-none border-2 border-ink bg-surface p-4 shadow-blueprint-lg animate-panel-in">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="bp-label">Candidate picker</p>
+                <p className="bp-meta">Choose who to evaluate next</p>
+              </div>
+              <button type="button" onClick={() => setShowCandidatePicker(false)} className="border-2 border-ink p-2 bp-press">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] space-y-2 overflow-auto">
+              {eligibleCandidates.map((candidateItem, index) => (
+                <button
+                  key={candidateItem.id}
+                  type="button"
+                  onClick={() => pickCandidate(candidateItem.id)}
+                  className="flex w-full items-center justify-between border-2 border-ink bg-surface-dim px-3 py-3 text-left bp-press animate-fade-in-up"
+                  style={{ animationDelay: `${index * 40}ms` }}
+                >
+                  <span>
+                    <span className="block font-display font-bold">{candidateItem.name}</span>
+                    <span className="bp-meta">{candidateItem.code}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
 
@@ -560,7 +715,7 @@ function Phase1Page() {
 
                 placeholder="Enter technical observations here..."
 
-                className="block min-h-[100px] w-full resize-y border-2 border-ink bg-surface-dim p-3 font-sans text-[14px] placeholder:text-muted-foreground/70 focus:bg-surface focus:outline-none"
+                className="block min-h-25 w-full resize-y border-2 border-ink bg-surface-dim p-3 font-sans text-[14px] placeholder:text-muted-foreground/70 focus:bg-surface focus:outline-none"
 
               />
 

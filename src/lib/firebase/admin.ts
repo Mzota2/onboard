@@ -91,7 +91,7 @@ export async function clearAllPositionScenariosAndQuestions(): Promise<number> {
 export async function getPhaseReleaseReadiness(positionId: string, field: "phase1ConsentReleased" | "phase2ConsentReleased") {
   const phase = field === "phase1ConsentReleased" ? "phase1" : "phase2";
   const [users, candidates] = await Promise.all([listUsers(), listCandidates(positionId)]);
-  const interviewers = users.filter((user) => user.role === "interviewer");
+  const interviewers = users.filter((user) => user.role === "interviewer" || user.role === "admin");
 
   if (interviewers.length === 0) {
     return {
@@ -124,8 +124,9 @@ export async function getPhaseReleaseReadiness(positionId: string, field: "phase
 
 export async function getInterviewerProgress(positionId?: string) {
   const [users, candidates] = await Promise.all([listUsers(), listCandidates(positionId)]);
+  const interviewers = users.filter((user) => user.role === "interviewer" || user.role === "admin");
 
-  if (users.length === 0) {
+  if (interviewers.length === 0) {
     return [];
   }
 
@@ -137,7 +138,7 @@ export async function getInterviewerProgress(positionId?: string) {
   const phase1Evaluations = evaluationsByPhase[0].flat();
   const phase2Evaluations = evaluationsByPhase[1].flat();
 
-  return users.map((user) => {
+  return interviewers.map((user) => {
     const phase1Completed = phase1Evaluations.filter(
       (evaluation) => evaluation.interviewerId === user.uid && evaluation.isComplete,
     ).length;

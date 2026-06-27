@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
-import { Circle, FileEdit, CheckCircle2, Loader2, FileText, Users, ArrowRight, ArrowLeft } from "lucide-react";
+import { Circle, FileEdit, CheckCircle2, Loader2, FileText, Users, ArrowRight, ArrowLeft, Sparkles, X } from "lucide-react";
 
 import { useState} from "react";
 
@@ -90,7 +90,11 @@ function Phase2Page() {
 
   const { data: candidates = [] } = useCandidates(activePosition?.id);
 
-  const candidate = candidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.promoted);
+  const eligibleCandidates = [...candidates]
+    .filter((candidateItem) => !candidateItem.disqualified && candidateItem.promotedToPhase2)
+    .sort((a, b) => a.rank - b.rank || b.aggregateScore - a.aggregateScore);
+
+  const candidate = eligibleCandidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.promoted);
   const canAccessPhase2 = canStartPhase2Review({
     promotedToPhase2: Boolean(candidate?.promotedToPhase2),
     phase1ConsentReleased: activePosition?.phase1ConsentReleased,
@@ -167,6 +171,7 @@ function Phase2Page() {
   const [submissionProgress, setSubmissionProgress] = useState<string>("");
   const [questionScores, setQuestionScores] = useState<Record<string, { criteria: Record<string, number>; notes: string }>>({});
   const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward' | null>(null);
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false);
 
   
 
@@ -293,6 +298,23 @@ function Phase2Page() {
 
 
 
+  const startEvaluation = () => {
+    if (!activePosition) return;
+    const firstCandidate = eligibleCandidates[0];
+    if (!firstCandidate) {
+      toast.error("No promoted candidates are ready yet.");
+      return;
+    }
+
+    navigate({ to: "/phase2", search: { candidateId: firstCandidate.id } });
+    setShowCandidatePicker(false);
+  };
+
+  const pickCandidate = (nextCandidateId: string) => {
+    navigate({ to: "/phase2", search: { candidateId: nextCandidateId } });
+    setShowCandidatePicker(false);
+  };
+
   const handleSubmit = async () => {
 
     if (!candidate || !profile) return;
@@ -351,8 +373,24 @@ function Phase2Page() {
       await queryClient.invalidateQueries({ queryKey: ["candidates"] });
       await queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
 
-      toast.success("Phase 2 evaluation submitted");
-      navigate({ to: "/evaluation/phase2/$id", params: { id: candidate.id } });
+      // Find the next promoted candidate (in ranked order) who has NOT completed phase 2
+      const currentIndex = eligibleCandidates.findIndex((c) => c.id === candidate.id);
+      let nextCandidate;
+      if (currentIndex >= 0) {
+        nextCandidate = eligibleCandidates.slice(currentIndex + 1).find((c) => !c.phase2Complete);
+      }
+      // Fallback: search the whole promoted list for any unevaluated candidate
+      if (!nextCandidate) {
+        nextCandidate = eligibleCandidates.find((c) => !c.phase2Complete && c.id !== candidate.id);
+      }
+
+      if (nextCandidate) {
+        toast.success("Evaluation complete. Moving to the next candidate.");
+        navigate({ to: "/phase2", search: { candidateId: nextCandidate.id } });
+      } else {
+        toast.success("Phase 2 evaluation submitted");
+        navigate({ to: "/candidate" });
+      }
 
     } catch {
 
@@ -373,6 +411,76 @@ function Phase2Page() {
     return (
 
       <AppShell>
+
+        <div className="bp-fade-up bp-card p-6 animate-fade-in-up">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+            <Sparkles className="h-3 w-3" /> Streamlined review flow
+          </div>
+          <h1 className="mt-3 font-display text-[32px] leading-[0.95] font-extrabold uppercase">Start Phase 02</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Kick off the next promoted candidate instantly. After each submission, the next candidate appears automatically.
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={startEvaluation}
+              className="flex items-center gap-2 border-2 border-ink bg-ink px-4 py-3 text-surface font-mono text-[11px] uppercase tracking-widest bp-press animate-glow-pulse"
+            >
+              <Sparkles className="h-4 w-4" /> Start Evaluation
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCandidatePicker(true)}
+              className="flex items-center gap-2 border-2 border-ink bg-surface px-4 py-3 font-mono text-[11px] uppercase tracking-widest bp-press"
+            >
+              <Users className="h-4 w-4" /> Choose Candidate
+            </button>
+          </div>
+
+          <div className="mt-5 border-2 border-dashed border-ink/40 p-4">
+            <p className="bp-meta">Promoted candidates ready</p>
+            <p className="mt-1 font-display text-xl font-bold">{eligibleCandidates.length}</p>
+            {eligibleCandidates[0] ? (
+              <p className="mt-2 text-sm text-muted-foreground">First up: {eligibleCandidates[0].name}</p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No promoted candidates are available yet.</p>
+            )}
+          </div>
+        </div>
+
+        {showCandidatePicker && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
+            <div className="w-full max-w-xl rounded-none border-2 border-ink bg-surface p-4 shadow-blueprint-lg animate-panel-in">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="bp-label">Candidate picker</p>
+                  <p className="bp-meta">Choose who to evaluate next</p>
+                </div>
+                <button type="button" onClick={() => setShowCandidatePicker(false)} className="border-2 border-ink p-2 bp-press">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-[60vh] space-y-2 overflow-auto">
+                {eligibleCandidates.map((candidateItem, index) => (
+                  <button
+                    key={candidateItem.id}
+                    type="button"
+                    onClick={() => pickCandidate(candidateItem.id)}
+                    className="flex w-full items-center justify-between border-2 border-ink bg-surface-dim px-3 py-3 text-left bp-press animate-fade-in-up"
+                    style={{ animationDelay: `${index * 40}ms` }}
+                  >
+                    <span>
+                      <span className="block font-display font-bold">{candidateItem.name}</span>
+                      <span className="bp-meta">{candidateItem.code}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <Tabs value="review" className="w-full">
 
@@ -660,7 +768,7 @@ function Phase2Page() {
 
                   onChange={(e) => setNotes(e.target.value)}
 
-                  className="mt-3 block w-full resize-y border-2 border-ink bg-surface-dim p-3 font-sans text-[14px] placeholder:text-muted-foreground/70 focus:bg-surface focus:outline-none min-h-[140px]"
+                  className="mt-3 block w-full resize-y border-2 border-ink bg-surface-dim p-3 font-sans text-[14px] placeholder:text-muted-foreground/70 focus:bg-surface focus:outline-none min-h-35"
 
                   placeholder="Type detailed observations regarding the candidate's answer here..."
 
