@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { listEvaluations } from "@/lib/firebase/evaluations";
+import { canStartPhase2Review } from "@/lib/phase2-access";
 
 export const Route = createFileRoute("/candidate")({
   beforeLoad: requireAuth,
@@ -231,6 +232,10 @@ function CandidateCard({
   animationDelay?: number;
 }) {
   const selected = c.promoted || c.status === "phase2";
+  const canAccessPhase2 = canStartPhase2Review({
+    promotedToPhase2: c.promotedToPhase2,
+    phase1ConsentReleased: position?.phase1ConsentReleased,
+  });
 
   // Determine primary action
   const getPrimaryAction = () => {
@@ -249,10 +254,17 @@ function CandidateCard({
       );
     }
     if (c.promotedToPhase2) {
+      if (canAccessPhase2) {
+        return (
+          <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
+            Start Phase 2
+          </Link>
+        );
+      }
       return (
-        <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
-          Start Phase 2
-        </Link>
+        <div className="border-2 border-dashed border-ink/30 bg-surface-dim px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Awaiting Phase 1 Release
+        </div>
       );
     }
     if (c.phase1Complete) {
@@ -342,9 +354,15 @@ function CandidateCard({
                   </Link>
                 )}
                 {c.phase1Complete && c.promotedToPhase2 && (
-                  <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
-                    Start Phase 2
-                  </Link>
+                  canAccessPhase2 ? (
+                    <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
+                      Start Phase 2
+                    </Link>
+                  ) : (
+                    <div className="border-2 border-dashed border-ink/30 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Awaiting Phase 1 Release
+                    </div>
+                  )
                 )}
                 {c.phase1Complete && !c.promotedToPhase2 && (
                   <div className="border-2 border-dashed border-ink/30 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

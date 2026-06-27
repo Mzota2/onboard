@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { canStartPhase2Review } from "@/lib/phase2-access";
 
 
 
@@ -90,6 +91,10 @@ function Phase2Page() {
   const { data: candidates = [] } = useCandidates(activePosition?.id);
 
   const candidate = candidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.promoted);
+  const canAccessPhase2 = canStartPhase2Review({
+    promotedToPhase2: Boolean(candidate?.promotedToPhase2),
+    phase1ConsentReleased: activePosition?.phase1ConsentReleased,
+  });
 
   // Prevent evaluation of disqualified candidates
   if (candidate?.disqualified) {
@@ -106,6 +111,22 @@ function Phase2Page() {
             className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
           >
             Return to Pipeline
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (candidate && !canAccessPhase2) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label">Phase 2 Review Locked</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            Phase 2 review can only begin after Phase 1 results have been officially released.
+          </p>
+          <Link to="/candidate" className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press">
+            Return to Candidates
           </Link>
         </div>
       </AppShell>

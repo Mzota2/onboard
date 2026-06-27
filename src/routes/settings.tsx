@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { KeyRound, Bell, Users, LogOut, ShieldCheck } from "lucide-react";
+import { KeyRound, Bell, Users, LogOut, ShieldCheck, Trash2, RotateCcw, FileStack } from "lucide-react";
 import { useState } from "react";
 import { AppShell, Toggle } from "@/components/AppShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/lib/firebase/auth-service";
+import { deleteAllEvaluations, resetAppDataExceptUsers, clearAllPositionScenariosAndQuestions } from "@/lib/firebase/admin";
 import { updateUserSettings } from "@/lib/firebase/users";
 import { requireAuth } from "@/lib/route-guards";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ function SettingsPage() {
   const navigate = useNavigate();
   const { profile, isAdmin, refreshProfile } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [adminBusy, setAdminBusy] = useState(false);
 
   if (!profile) return null;
 
@@ -46,6 +48,39 @@ function SettingsPage() {
     } catch {
       toast.error("Sign out failed");
     }
+  };
+
+  const confirmAndRun = async (message: string, action: () => Promise<unknown>) => {
+    if (!window.confirm(message)) return;
+    setAdminBusy(true);
+    try {
+      await action();
+    } catch {
+      toast.error("Administrative action failed");
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const handleDeleteEvaluations = () => {
+    confirmAndRun("Delete all evaluations? This cannot be undone.", async () => {
+      const count = await deleteAllEvaluations();
+      toast.success(`${count} evaluation${count === 1 ? "" : "s"} removed`);
+    });
+  };
+
+  const handleResetApp = () => {
+    confirmAndRun("Reset the app data and remove positions, candidates, and evaluations while keeping interviewer accounts intact?", async () => {
+      const summary = await resetAppDataExceptUsers();
+      toast.success(`Reset complete. Removed ${summary.deletedPositions} positions, ${summary.deletedCandidates} candidates, and ${summary.deletedEvaluations} evaluations. Preserved ${summary.preservedUsers} user account${summary.preservedUsers === 1 ? "" : "s"}.`);
+    });
+  };
+
+  const handleClearScenarios = () => {
+    confirmAndRun("Clear all scenarios and questions from every phase? This will remove the current question scaffolding from all positions.", async () => {
+      const count = await clearAllPositionScenariosAndQuestions();
+      toast.success(`Cleared scenarios and questions from ${count} position${count === 1 ? "" : "s"}`);
+    });
   };
 
   return (
@@ -97,8 +132,36 @@ function SettingsPage() {
 
       {isAdmin && (
         <section className="bp-card mt-5 p-5">
-          <p className="bp-label">Manage</p>
+          <p className="bp-label">Admin Controls</p>
+          <p className="mt-1 bp-meta">Use these with care. They remove data from Firestore immediately.</p>
           <div className="mt-3 grid gap-2">
+            <button
+              type="button"
+              onClick={handleDeleteEvaluations}
+              disabled={adminBusy}
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><Trash2 className="h-4 w-4" /> Clear All Evaluations</span>
+              <span className="font-mono text-[11px]">Delete</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleResetApp}
+              disabled={adminBusy}
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><RotateCcw className="h-4 w-4" /> Reset App Data</span>
+              <span className="font-mono text-[11px]">Keep users</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClearScenarios}
+              disabled={adminBusy}
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><FileStack className="h-4 w-4" /> Clear Scenarios & Questions</span>
+              <span className="font-mono text-[11px]">Reset content</span>
+            </button>
             <button className="flex items-center justify-between border-2 border-ink px-4 py-3 bp-press">
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><Users className="h-4 w-4" /> Team Roles</span>
               <span className="font-mono text-[11px]">Admin</span>

@@ -298,7 +298,7 @@ function QuestionManager({
   const openAdd = () => {
     setPrompt("");
     setScenarioId(scenarios[0]?.id || "");
-    setPhase(phaseFilter === "phase1" ? "phase1" : "phase2");
+    setPhase(phaseKey === "phase1Questions" ? "phase1" : "phase2");
     setEditTarget(null);
     setAdding(true);
   };
