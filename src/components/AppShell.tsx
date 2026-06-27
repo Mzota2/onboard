@@ -9,7 +9,7 @@ export function AppShell({ children, hideNav = false }: { children: ReactNode; h
   return (
     <div className="min-h-screen bg-background bp-dots">
       <TopBar />
-      <main className="mx-auto w-full max-w-[480px] px-4 pt-4 pb-28">{children}</main>
+      <main className="mx-auto w-full max-w-120 px-4 pt-4 pb-28 bp-page-enter">{children}</main>
       {!hideNav && <BottomNav path={path} />}
     </div>
   );
@@ -21,7 +21,7 @@ function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b-2 border-ink bg-surface/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-[480px] items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-120 items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
           <LogoMark className="h-5 w-5" />
           <span className="font-display text-[15px] font-bold tracking-tight uppercase">Onboard</span>
@@ -52,7 +52,7 @@ function BottomNav({ path }: { path: string }) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-surface">
-      <div className={`mx-auto grid max-w-[480px] ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
+      <div className={`mx-auto grid max-w-120 ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
         {items.map(({ to, label, icon: Icon }) => {
           const active = to === "/" ? path === "/" : path.startsWith(to);
           return (
@@ -123,8 +123,8 @@ export function Toggle({ on, onClick, label }: { on: boolean; onClick?: () => vo
     >
       <span
         className={
-          "block h-[22px] w-[22px] transition-transform " +
-          (on ? "translate-x-[28px] bg-ink" : "translate-x-[2px] bg-ink")
+          "block h-5.5 w-5.5 transition-transform " +
+          (on ? "translate-x-7 bg-ink" : "translate-x-0.5 bg-ink")
         }
       />
       <span className="absolute inset-0 flex justify-between px-1.5 font-mono text-[8px] font-bold">

@@ -34,18 +34,45 @@ if (typeof window !== "undefined" && isFirebaseConfigured()) {
   // Set auth persistence to LOCAL (uses secure browser storage)
   authInitPromise = setPersistence(auth, browserLocalPersistence)
     .then(() => {
-      // Wait for auth to initialize and restore session
+      // Wait for auth to initialize and restore the persisted session before
+      // allowing route guards to decide whether the user is signed in.
       return new Promise<void>((resolve) => {
         if (!auth) {
           authInitialized = true;
           resolve();
           return;
         }
-        const unsubscribe = onAuthStateChanged(auth, () => {
+
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
           authInitialized = true;
-          unsubscribe();
           resolve();
+        };
+
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (user) {
+            unsubscribe();
+            finish();
+            return;
+          }
+
+          // A transient null event can happen while Firebase is restoring the
+          // persisted session. Wait briefly before treating the user as signed out.
+          const fallback = window.setTimeout(() => {
+            unsubscribe();
+            finish();
+          }, 600);
+
+          return () => window.clearTimeout(fallback);
         });
+
+        window.setTimeout(() => {
+          if (!settled) {
+            finish();
+          }
+        }, 1000);
       });
     })
     .catch((error) => {

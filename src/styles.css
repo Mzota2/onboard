@@ -108,11 +108,33 @@
     border-color: var(--color-border);
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    transition: background-color .2s ease, color .2s ease;
+  }
+
+  button, [role="button"], a, input, textarea, select {
+    transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease, opacity .2s ease;
+  }
+
+  button:focus-visible, [role="button"]:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--surface);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -212,8 +234,11 @@
 
 /* Tactile press */
 .bp-press {
-  transition: transform .08s ease, box-shadow .08s ease;
+  transition: transform .16s ease, box-shadow .16s ease, background-color .2s ease, opacity .2s ease;
+  transform: translateZ(0);
+  will-change: transform, box-shadow;
 }
+.bp-press:hover { transform: translateY(-1px); }
 .bp-press:active { transform: translate(2px, 2px); box-shadow: none !important; }
 
 /* Marquee tape */
@@ -242,6 +267,13 @@
   animation: bp-scan 3.5s linear infinite;
   pointer-events: none;
 }
+
+/* Page entry */
+@keyframes bp-page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.bp-page-enter { animation: bp-page-enter .28s ease-out both; }
 
 /* Fade-in */
 @keyframes bp-fade-up {
@@ -288,3 +320,12 @@
   50% { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.03); }
 }
 .animate-glow-pulse { animation: glow-pulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

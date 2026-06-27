@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { KeyRound, Bell, Users, LogOut, ShieldCheck, Trash2, RotateCcw, FileStack, Crown } from "lucide-react";
+import { KeyRound, Bell, Users, LogOut, ShieldCheck, Trash2, RotateCcw, FileStack, Crown, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, Toggle } from "@/components/AppShell";
 import { useAuth } from "@/contexts/AuthContext";
@@ -171,7 +171,7 @@ function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => handlePromoteToAdmin(user.uid)}
-                      className="flex items-center gap-2 border-2 border-ink px-2 py-1 font-mono text-[10px] uppercase tracking-widest bp-press"
+                      className="flex items-center gap-2 border-2 border-ink px-2 py-1 font-mono text-[10px] uppercase tracking-widest bp-press animate-soft-pop"
                     >
                       <Crown className="h-3 w-3" /> Make Admin
                     </button>
@@ -182,11 +182,16 @@ function SettingsPage() {
           </div>
           <p className="mt-1 bp-meta">Use these with care. They remove data from Firestore immediately.</p>
           <div className="mt-3 grid gap-2">
+            {adminBusy && (
+              <div className="flex items-center gap-2 border-2 border-ink bg-surface-dim px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground animate-fade-in-up">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working on the requested action...
+              </div>
+            )}
             <button
               type="button"
               onClick={handleDeleteEvaluations}
               disabled={adminBusy}
-              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press animate-soft-pop disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><Trash2 className="h-4 w-4" /> Clear All Evaluations</span>
               <span className="font-mono text-[11px]">Delete</span>
@@ -195,7 +200,7 @@ function SettingsPage() {
               type="button"
               onClick={handleResetApp}
               disabled={adminBusy}
-              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press animate-soft-pop disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><RotateCcw className="h-4 w-4" /> Reset App Data</span>
               <span className="font-mono text-[11px]">Keep users</span>
@@ -204,16 +209,16 @@ function SettingsPage() {
               type="button"
               onClick={handleClearScenarios}
               disabled={adminBusy}
-              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center justify-between border-2 border-ink px-4 py-3 text-left bp-press animate-soft-pop disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><FileStack className="h-4 w-4" /> Clear Scenarios & Questions</span>
               <span className="font-mono text-[11px]">Reset content</span>
             </button>
-            <button className="flex items-center justify-between border-2 border-ink px-4 py-3 bp-press">
+            <button className="flex items-center justify-between border-2 border-ink px-4 py-3 bp-press animate-soft-pop">
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><Users className="h-4 w-4" /> Team Roles</span>
               <span className="font-mono text-[11px]">Admin</span>
             </button>
-            <button className="flex items-center justify-between border-2 border-ink px-4 py-3 bp-press">
+            <button className="flex items-center justify-between border-2 border-ink px-4 py-3 bp-press animate-soft-pop">
               <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase"><KeyRound className="h-4 w-4" /> Security Keys</span>
               <span className="font-mono text-[11px]">Firebase</span>
             </button>
@@ -224,7 +229,7 @@ function SettingsPage() {
       <button
         type="button"
         onClick={handleSignOut}
-        className="mt-5 flex w-full items-center justify-center gap-2 border-2 border-ink bg-surface py-4 bp-press"
+        className="mt-5 flex w-full items-center justify-center gap-2 border-2 border-ink bg-surface py-4 bp-press animate-soft-pop"
       >
         <LogOut className="h-4 w-4" />
         <span className="font-mono text-[11px] tracking-widest uppercase">Sign Out</span>
