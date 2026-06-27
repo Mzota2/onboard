@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Workflow, Users, Settings as SettingsIcon } from "lucide-react";
+import { Workflow, Users, Settings as SettingsIcon, Shield } from "lucide-react";
 import type { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -42,15 +42,17 @@ function TopBar() {
 }
 
 function BottomNav({ path }: { path: string }) {
+  const { isAdmin } = useAuth();
   const items = [
     { to: "/", label: "Pipeline", icon: Workflow },
     { to: "/candidate", label: "Candidates", icon: Users },
+    ...(isAdmin ? [{ to: "/admin", label: "Admin", icon: Shield }] as const : []),
     { to: "/settings", label: "Settings", icon: SettingsIcon },
   ] as const;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-surface">
-      <div className="mx-auto grid max-w-[480px] grid-cols-3">
+      <div className={`mx-auto grid max-w-[480px] ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
         {items.map(({ to, label, icon: Icon }) => {
           const active = to === "/" ? path === "/" : path.startsWith(to);
           return (

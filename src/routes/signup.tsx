@@ -72,7 +72,7 @@ function SignUpPage() {
         <AuthField
           icon={UserRound}
           label="Full Name"
-          placeholder="Marcus Thorne"
+          placeholder="James Phiri"
           value={displayName}
           onChange={setDisplayName}
           autoComplete="name"
@@ -97,6 +97,7 @@ function SignUpPage() {
           onChange={setPassword}
           autoComplete="new-password"
           required
+          showPasswordToggle
         />
 
         <AuthError message={error} />

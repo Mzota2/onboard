@@ -148,20 +148,13 @@ export function ScenarioManager({
           No scenarios yet. Create scenarios to define evaluation criteria.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-ink/20">
           {scenarios.map((s) => (
-            <li key={s.id} className="border-2 border-ink bg-surface px-3 py-2.5">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="font-display text-sm font-bold">{s.name}</p>
-                  <p className="bp-meta text-[12px]">{s.description}</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {s.criteria.map((c) => (
-                      <span key={c.id} className="border border-ink/50 bg-surface-dim px-1.5 py-0.5 text-[10px] font-mono">
-                        {c.name}
-                      </span>
-                    ))}
-                  </div>
+            <li key={s.id} className="flex-shrink-0 w-72 border-2 border-ink bg-surface px-3 py-2.5">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-display text-sm font-bold truncate">{s.name}</p>
+                  <p className="bp-meta text-[12px] line-clamp-2">{s.description}</p>
                 </div>
                 <div className="flex shrink-0 gap-1 ml-2">
                   <button type="button" onClick={() => openEdit(s)} aria-label="Edit scenario">
@@ -172,9 +165,16 @@ export function ScenarioManager({
                   </button>
                 </div>
               </div>
+              <div className="flex flex-wrap gap-1">
+                {s.criteria.map((c) => (
+                  <span key={c.id} className="border border-ink/50 bg-surface-dim px-1.5 py-0.5 text-[10px] font-mono">
+                    {c.name}
+                  </span>
+                ))}
+              </div>
             </li>
           ))}
-        </ul>
+        </div>
       )}
 
       <Dialog open={adding} onOpenChange={setAdding}>

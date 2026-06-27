@@ -19,14 +19,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useCandidates } from "@/hooks/use-vetting-data";
-import { deleteCandidate, deleteCandidatesByPosition, updateCandidate } from "@/lib/firebase/candidates";
 import {
   deletePosition,
   newQuestionId,
   updatePosition,
 } from "@/lib/firebase/positions";
-import type { Candidate, Position, PositionQuestion, SilhouetteKind } from "@/lib/firebase/types";
+import type { Position, PositionQuestion } from "@/lib/firebase/types";
 import { ScenarioManager } from "./ScenarioManager";
 
 type PhaseKey = "phase1Questions" | "phase2Questions";
@@ -55,7 +53,6 @@ export function AdminPipelinePanel({
 }) {
   const [expanded, setExpanded] = useState(true);
   const queryClient = useQueryClient();
-  const { data: candidates = [] } = useCandidates(position.id);
 
   const invalidate = async () => {
     await Promise.all([
@@ -102,7 +99,6 @@ export function AdminPipelinePanel({
 
             <PositionEditor position={position} onSaved={invalidate} onDeleted={invalidate} />
             <ScenarioManager position={position} onSaved={invalidate} />
-            <CandidateManager candidates={candidates} onSaved={invalidate} />
           </div>
         )}
       </div>
@@ -381,37 +377,37 @@ function QuestionManager({
             : "No questions yet. Add one to get started."}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-ink/20">
           {questions.map((q) => {
             const scenario = scenarios.find(s => s.id === q.scenarioId);
             return (
-              <li key={q.id} className="flex items-start gap-2 border-2 border-ink bg-surface px-3 py-2.5">
-                <span className="mt-0.5 font-mono text-[10px] font-bold text-muted-foreground">
-                  Q{q.order.toString().padStart(2, "0")}
-                </span>
-                <div className="flex-1">
-                  <p className="text-[13px] leading-snug">{q.prompt}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="border border-ink/50 bg-surface-dim px-1.5 py-0.5 text-[10px] font-mono">
-                      {scenario?.name || "No scenario"}
-                    </span>
-                    <span className="bp-meta text-[10px]">
-                      {q.phase === "both" ? "Both phases" : q.phase === "phase1" ? "Phase 1" : "Phase 2"}
-                    </span>
+              <li key={q.id} className="flex-shrink-0 w-72 border-2 border-ink bg-surface px-3 py-2.5">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="font-mono text-[10px] font-bold text-muted-foreground">
+                    Q{q.order.toString().padStart(2, "0")}
+                  </span>
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" onClick={() => openEdit(q)} aria-label="Edit question">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => setDeleteTarget(q)} aria-label="Delete question">
+                      <Trash2 className="h-3.5 w-3.5 text-alert" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                  <button type="button" onClick={() => openEdit(q)} aria-label="Edit question">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" onClick={() => setDeleteTarget(q)} aria-label="Delete question">
-                    <Trash2 className="h-3.5 w-3.5 text-alert" />
-                  </button>
+                <p className="text-[13px] leading-snug line-clamp-3 mb-2">{q.prompt}</p>
+                <div className="flex items-center gap-2">
+                  <span className="border border-ink/50 bg-surface-dim px-1.5 py-0.5 text-[10px] font-mono">
+                    {scenario?.name || "No scenario"}
+                  </span>
+                  <span className="bp-meta text-[10px]">
+                    {q.phase === "both" ? "Both phases" : q.phase === "phase1" ? "Phase 1" : "Phase 2"}
+                  </span>
                 </div>
               </li>
             );
           })}
-        </ul>
+        </div>
       )}
 
       <Dialog open={adding} onOpenChange={setAdding}>
@@ -488,136 +484,6 @@ function QuestionManager({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={removeQuestion} disabled={saving}>
               Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-function CandidateManager({
-  candidates,
-  onSaved,
-}: {
-  candidates: Candidate[];
-  onSaved: () => Promise<void>;
-}) {
-  const [editTarget, setEditTarget] = useState<Candidate | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Candidate | null>(null);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [currentRole, setCurrentRole] = useState("");
-  const [silhouette, setSilhouette] = useState<SilhouetteKind>("m1");
-  const [saving, setSaving] = useState(false);
-
-  const openEdit = (c: Candidate) => {
-    setEditTarget(c);
-    setName(c.name);
-    setCode(c.code);
-    setCurrentRole(c.currentRole);
-    setSilhouette(c.silhouette);
-  };
-
-  const save = async () => {
-    if (!editTarget || !name.trim() || !code.trim()) {
-      toast.error("Name and code are required");
-      return;
-    }
-    setSaving(true);
-    try {
-      await updateCandidate(editTarget.id, {
-        name: name.trim(),
-        code: code.trim().toUpperCase(),
-        currentRole: currentRole.trim() || "Candidate",
-        silhouette,
-      });
-      await onSaved();
-      toast.success("Candidate updated");
-      setEditTarget(null);
-    } catch {
-      toast.error("Failed to update candidate");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async () => {
-    if (!deleteTarget) return;
-    setSaving(true);
-    try {
-      await deleteCandidate(deleteTarget.id);
-      await onSaved();
-      toast.success("Candidate deleted");
-      setDeleteTarget(null);
-    } catch {
-      toast.error("Failed to delete candidate");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div>
-      <p className="bp-label mb-3">Candidates ({candidates.length})</p>
-      {candidates.length === 0 ? (
-        <p className="border-2 border-dashed border-ink/40 px-3 py-4 text-center text-[13px] text-muted-foreground">
-          No candidates for this position yet.
-        </p>
-      ) : (
-        <ul className="max-h-48 space-y-2 overflow-y-auto">
-          {candidates.map((c) => (
-            <li key={c.id} className="flex items-center gap-2 border-2 border-ink px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-sm font-bold">{c.name}</p>
-                <p className="bp-meta truncate">{c.code} · {c.currentRole}</p>
-              </div>
-              <button type="button" onClick={() => openEdit(c)} aria-label="Edit candidate">
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" onClick={() => setDeleteTarget(c)} aria-label="Delete candidate">
-                <Trash2 className="h-3.5 w-3.5 text-alert" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] border-2 border-ink sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display uppercase tracking-tight">Edit Candidate</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full border-2 border-ink px-3 py-2.5 focus:outline-none" />
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Candidate code" className="w-full border-2 border-ink px-3 py-2.5 font-mono focus:outline-none" />
-            <input value={currentRole} onChange={(e) => setCurrentRole(e.target.value)} placeholder="Current role" className="w-full border-2 border-ink px-3 py-2.5 focus:outline-none" />
-            <select value={silhouette} onChange={(e) => setSilhouette(e.target.value as SilhouetteKind)} className="w-full border-2 border-ink px-3 py-2.5 font-mono text-[12px] focus:outline-none">
-              <option value="m1">Silhouette M1</option>
-              <option value="f1">Silhouette F1</option>
-              <option value="m2">Silhouette M2</option>
-            </select>
-          </div>
-          <DialogFooter>
-            <button type="button" onClick={save} disabled={saving} className="w-full border-2 border-ink bg-ink py-3 font-mono text-[11px] uppercase tracking-widest text-surface disabled:opacity-60">
-              {saving ? "Saving..." : "Save Candidate"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent className="border-2 border-ink">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete candidate?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget?.name} ({deleteTarget?.code}) will be permanently removed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={remove} disabled={saving}>
-              {saving ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

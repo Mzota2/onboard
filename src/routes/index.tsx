@@ -1,8 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { UserPlus, Plus, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { UserPlus, Plus, ArrowRight, Lock, Loader2, Settings as SettingsIcon } from "lucide-react";
 import { AppShell, ScoreBlocks, Toggle } from "@/components/AppShell";
-import { AdminPipelinePanel } from "@/components/admin/AdminPipelinePanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePipelineStats, usePositions } from "@/hooks/use-vetting-data";
 import { updatePositionConsent } from "@/lib/firebase/positions";
@@ -26,8 +24,7 @@ function PipelinePage() {
   const { data: positions = [], isLoading: positionsLoading } = usePositions();
   const { data: stats, isLoading: statsLoading } = usePipelineStats();
   const queryClient = useQueryClient();
-  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null);
-  const activePosition = positions.find((p) => p.id === selectedPositionId) ?? positions[0];
+  const activePosition = positions[0];
 
   const toggleConsent = async (field: "phase1ConsentReleased" | "phase2ConsentReleased", value: boolean) => {
     if (!isAdmin || !activePosition) return;
@@ -63,14 +60,23 @@ function PipelinePage() {
             <UserPlus className="h-4 w-4" />
           </Link>
           {isAdmin ? (
-            <Link
-              to="/transition"
-              search={activePosition ? { positionId: activePosition.id } : undefined}
-              className="flex items-center justify-between border-2 border-ink bg-surface px-4 py-3 bp-press"
-            >
-              <span className="font-mono text-[12px] tracking-widest uppercase">Create Position</span>
-              <Plus className="h-4 w-4" />
-            </Link>
+            <>
+              <Link
+                to="/transition"
+                search={activePosition ? { positionId: activePosition.id } : undefined}
+                className="mb-3 flex items-center justify-between border-2 border-ink bg-surface px-4 py-3 bp-press"
+              >
+                <span className="font-mono text-[12px] tracking-widest uppercase">Create Position</span>
+                <Plus className="h-4 w-4" />
+              </Link>
+              <Link
+                to="/admin"
+                className="flex items-center justify-between border-2 border-ink bg-surface px-4 py-3 bp-press"
+              >
+                <span className="font-mono text-[12px] tracking-widest uppercase">Admin Controls</span>
+                <SettingsIcon className="h-4 w-4" />
+              </Link>
+            </>
           ) : (
             <div className="border-2 border-dashed border-ink/40 px-4 py-3 text-[13px] text-muted-foreground">
               Admin access required to create positions.
@@ -78,14 +84,6 @@ function PipelinePage() {
           )}
         </div>
       </section>
-
-      {isAdmin && activePosition && (
-        <AdminPipelinePanel
-          position={activePosition}
-          positions={positions}
-          onPositionChange={setSelectedPositionId}
-        />
-      )}
 
       <section className="bp-card mb-6 p-5">
         <SystemIllustration />

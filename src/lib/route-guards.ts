@@ -1,9 +1,13 @@
 import { redirect } from "@tanstack/react-router";
 import { waitForAuthInit } from "./auth-store";
+import { waitForFirebaseAuth } from "./firebase/config";
 import { getCandidate } from "./firebase/candidates";
 import type { UserProfile } from "./firebase/types";
 
 export async function requireAuth(): Promise<UserProfile> {
+  // Wait for Firebase Auth to initialize and restore session
+  await waitForFirebaseAuth();
+  
   const { profile } = await waitForAuthInit();
   if (!profile) {
     throw redirect({ to: "/login" });
@@ -12,6 +16,9 @@ export async function requireAuth(): Promise<UserProfile> {
 }
 
 export async function requireGuest(): Promise<void> {
+  // Wait for Firebase Auth to initialize and restore session
+  await waitForFirebaseAuth();
+  
   const { profile } = await waitForAuthInit();
   if (profile) {
     throw redirect({ to: "/" });

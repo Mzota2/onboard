@@ -76,6 +76,7 @@ function LoginPage() {
           onChange={setPassword}
           autoComplete="current-password"
           required
+          showPasswordToggle
         />
 
         <AuthError message={error} />

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { LogoMark, Wordmark } from "@/components/AppShell";
 
 interface AuthLayoutProps {
@@ -34,7 +35,7 @@ export function AuthLayout({ children, title, subtitle, footer }: AuthLayoutProp
         </section>
 
         <footer className="flex items-center justify-between border-2 border-t-0 border-ink bg-surface-dim px-4 py-3">
-          <p className="bp-meta">VER: 2.1.0_BLPT</p>
+          <p className="bp-meta">onboard</p>
           {footer ?? <span className="bp-meta">Internal use only</span>}
         </footer>
       </div>
@@ -51,6 +52,7 @@ export function AuthField({
   onChange,
   autoComplete,
   required,
+  showPasswordToggle = false,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -60,13 +62,17 @@ export function AuthField({
   onChange: (value: string) => void;
   autoComplete?: string;
   required?: boolean;
+  showPasswordToggle?: boolean;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const inputType = showPasswordToggle && type === "password" ? (showPassword ? "text" : "password") : type;
+
   return (
     <div className="mt-5">
       <label className="bp-label mb-2 block">{label}</label>
       <div className="relative group">
         <input
-          type={type}
+          type={inputType}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
@@ -74,7 +80,19 @@ export function AuthField({
           required={required}
           className="block w-full border-2 border-ink bg-surface px-4 py-3.5 pr-12 font-sans text-[15px] transition-colors placeholder:text-muted-foreground/70 focus:bg-surface-dim focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
-        <Icon className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground group-focus-within:text-ink" />
+        <div className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          {showPasswordToggle && type === "password" && (
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="pointer-events-auto text-muted-foreground hover:text-ink transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          )}
+          <Icon className="pointer-events-none h-5 w-5 text-muted-foreground group-focus-within:text-ink" />
+        </div>
       </div>
     </div>
   );
