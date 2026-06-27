@@ -76,6 +76,50 @@ function Phase1Page() {
 
   const candidate = candidates.find((c) => c.id === candidateId);
 
+  // Prevent evaluation of disqualified candidates
+  if (candidate?.disqualified) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label text-alert">Candidate Disqualified</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            {candidate.name} has been disqualified and cannot be evaluated.
+            {candidate.disqualifiedReason && ` Reason: ${candidate.disqualifiedReason}`}
+          </p>
+          <Link
+            to="/"
+            className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
+          >
+            Return to Pipeline
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Prevent evaluation if Phase 1 results are released (unless admin)
+  if (activePosition?.phase1ConsentReleased && !isAdmin) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label">Phase 1 Results Released</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            Phase 1 results have been released to interviewers. Evaluation is now closed.
+          </p>
+          {candidateId ? (
+            <Link
+              to="/evaluation/phase1/$id"
+              params={{ id: candidateId }}
+              className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
+            >
+              View Results
+            </Link>
+          ) : null}
+        </div>
+      </AppShell>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<"add" | "score" | "questions" | "review">(candidate ? "score" : "add");
 
   const [name, setName] = useState("");

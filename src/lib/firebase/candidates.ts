@@ -34,6 +34,9 @@ function mapCandidate(id: string, data: DocumentData): Candidate {
     promotionMethod: data.promotionMethod ?? null,
     rank: data.rank ?? 0,
     aggregateScore: data.aggregateScore ?? 0,
+    disqualified: data.disqualified ?? false,
+    disqualifiedAt: data.disqualifiedAt?.toDate?.()?.toISOString?.(),
+    disqualifiedReason: data.disqualifiedReason,
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? "",
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? "",
   };
@@ -161,8 +164,10 @@ export async function deleteCandidatesByPosition(positionId: string): Promise<vo
 }
 
 export function computePipelineStats(candidates: Candidate[]) {
-  const phase1 = candidates.filter((c) => c.status === "phase1");
-  const phase2 = candidates.filter((c) => c.status === "phase2" || c.promoted);
+  // Exclude disqualified candidates from pipeline stats
+  const activeCandidates = candidates.filter((c) => !c.disqualified);
+  const phase1 = activeCandidates.filter((c) => c.status === "phase1");
+  const phase2 = activeCandidates.filter((c) => c.status === "phase2" || c.promoted);
   const phase1Pending = phase1.filter((c) => !c.phase1Complete).length;
   const phase2Pending = phase2.filter((c) => !c.phase2Complete).length;
 

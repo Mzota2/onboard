@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, Trash2, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, Trash2, Check, XCircle, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -24,7 +24,8 @@ import {
   newQuestionId,
   updatePosition,
 } from "@/lib/firebase/positions";
-import type { Position, PositionQuestion } from "@/lib/firebase/types";
+import { deleteCandidate, deleteCandidatesByPosition, updateCandidate } from "@/lib/firebase/candidates";
+import type { Position, PositionQuestion, Candidate, SilhouetteKind } from "@/lib/firebase/types";
 import { ScenarioManager } from "./ScenarioManager";
 
 type PhaseKey = "phase1Questions" | "phase2Questions";
@@ -501,6 +502,8 @@ export function AdminCandidateActions({
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [disqualifyOpen, setDisqualifyOpen] = useState(false);
+  const [disqualifyReason, setDisqualifyReason] = useState("");
   const [name, setName] = useState(candidate.name);
   const [code, setCode] = useState(candidate.code);
   const [currentRole, setCurrentRole] = useState(candidate.currentRole);
@@ -574,10 +577,65 @@ export function AdminCandidateActions({
     }
   };
 
+  const disqualify = async () => {
+    setSaving(true);
+    try {
+      await updateCandidate(candidate.id, {
+        disqualified: true,
+        disqualifiedAt: new Date().toISOString(),
+        disqualifiedReason: disqualifyReason.trim() || "No reason provided",
+      });
+      await onSaved();
+      toast.success("Candidate disqualified");
+      setDisqualifyOpen(false);
+      setDisqualifyReason("");
+    } catch {
+      toast.error("Failed to disqualify candidate");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reinstate = async () => {
+    setSaving(true);
+    try {
+      await updateCandidate(candidate.id, {
+        disqualified: false,
+        disqualifiedAt: undefined,
+        disqualifiedReason: undefined,
+      });
+      await onSaved();
+      toast.success("Candidate reinstated");
+    } catch {
+      toast.error("Failed to reinstate candidate");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <div className="mt-3 space-y-2">
-        {candidate.phase1Complete && (
+        {candidate.disqualified ? (
+          <button
+            type="button"
+            onClick={reinstate}
+            disabled={saving}
+            className="flex items-center justify-center gap-1 border-2 border-ink py-2 font-mono text-[10px] uppercase tracking-widest bp-press"
+          >
+            <RotateCcw className="h-3 w-3" /> Reinstate Candidate
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setDisqualifyOpen(true)}
+            disabled={saving}
+            className="flex items-center justify-center gap-1 border-2 border-alert text-alert py-2 font-mono text-[10px] uppercase tracking-widest bp-press"
+          >
+            <XCircle className="h-3 w-3" /> Disqualify
+          </button>
+        )}
+        {candidate.phase1Complete && !candidate.disqualified && (
           <button
             type="button"
             onClick={candidate.promotedToPhase2 ? demoteFromPhase2 : promoteToPhase2}
@@ -658,6 +716,45 @@ export function AdminCandidateActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={disqualifyOpen} onOpenChange={setDisqualifyOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] border-2 border-ink sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display uppercase tracking-tight">Disqualify Candidate</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[13px] text-muted-foreground">
+              Disqualifying {candidate.name} will prevent them from being evaluated in either phase.
+            </p>
+            <textarea
+              value={disqualifyReason}
+              onChange={(e) => setDisqualifyReason(e.target.value)}
+              placeholder="Reason for disqualification (optional)"
+              className="min-h-[80px] w-full resize-y border-2 border-ink bg-surface-dim p-3 text-[14px] focus:outline-none"
+            />
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => {
+                setDisqualifyOpen(false);
+                setDisqualifyReason("");
+              }}
+              className="w-full border-2 border-ink py-3 font-mono text-[11px] uppercase tracking-widest"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={disqualify}
+              disabled={saving}
+              className="w-full border-2 border-alert bg-alert py-3 font-mono text-[11px] uppercase tracking-widest text-surface disabled:opacity-60"
+            >
+              {saving ? "Disqualifying..." : "Disqualify"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

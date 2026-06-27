@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Download, Zap, ChevronLeft, ChevronRight, Clock, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Zap, ChevronLeft, ChevronRight, Clock, Loader2, ChevronDown, ChevronUp, Filter, X } from "lucide-react";
 import { useState } from "react";
 import { AppShell, Toggle } from "@/components/AppShell";
 import { AdminCandidateActions } from "@/components/admin/AdminPipelinePanel";
@@ -32,6 +32,7 @@ function CandidatesPage() {
   const { data: candidates = [], isLoading } = useCandidates(activePosition?.id);
   const queryClient = useQueryClient();
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "evaluated" | "phase2" | "disqualified" | "pending">("all");
 
   const toggleAutoSelect = async () => {
     if (!activePosition || !isAdmin) return;
@@ -58,14 +59,34 @@ function CandidatesPage() {
 
   const canViewScores = isAdmin || activePosition?.phase1ConsentReleased;
 
+  // Filter candidates based on selected filter
+  const filteredCandidates = candidates.filter((c) => {
+    switch (filter) {
+      case "evaluated":
+        return c.phase1Complete && !c.disqualified;
+      case "phase2":
+        return c.promotedToPhase2 && !c.disqualified;
+      case "disqualified":
+        return c.disqualified;
+      case "pending":
+        return !c.phase1Complete && !c.disqualified;
+      default:
+        return !c.disqualified;
+    }
+  });
+
   return (
     <AppShell>
-      <div className="mb-5 bp-fade-up">
-        <p className="bp-meta">{activePosition ? `Project ID: ${activePosition.code}` : "No active position"}</p>
-        <h1 className="mt-1 font-display text-[34px] leading-[0.95] font-extrabold tracking-tight uppercase">
-          {activePosition?.title ?? "Candidates"}
-        </h1>
-        <p className="mt-3 border-y-2 border-dashed border-ink/30 py-3 text-center text-[13px] leading-relaxed text-muted-foreground">
+      <div className="mb-4 bp-fade-up">
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-display text-[26px] leading-[1] font-extrabold tracking-tight uppercase">
+            {activePosition?.title ?? "Candidates"}
+          </h1>
+          {activePosition && (
+            <span className="bp-meta text-[11px]">{activePosition.code}</span>
+          )}
+        </div>
+        <p className="mt-1 text-[12px] text-muted-foreground">
           {activePosition?.description ?? "Create a position from the pipeline to begin tracking candidates."}
         </p>
       </div>
@@ -84,23 +105,9 @@ function CandidatesPage() {
         </div>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-3">
-            <button className="bp-card flex items-center justify-center gap-2 py-3 bp-press">
-              <Download className="h-4 w-4" />
-              <span className="font-mono text-[11px] tracking-widest uppercase">Export Log</span>
-            </button>
-            <button className="bp-card-shadow-sm text-black flex items-center justify-center gap-2 bg-ink py-3 bp-press">
-              <Zap className="h-4 w-4" />
-              <span className="text-center text-nowrap font-mono text-[11px] leading-tight tracking-widest uppercase">
-                Initiate Vetting
-              </span>
-            </button>
-          </div>
-
-          <div className="mb-3 space-y-3">
-            <StatRow label="Active Pipeline" value={`${candidates.length} Candidates`} />
-            <StatRow label="Interview Selection" value={`${candidates.filter((c) => c.promoted).length} Selected`} emphasis />
-            <StatRow label="Review Pending" value={`${candidates.filter((c) => !c.phase1Scores).length} Profiles`} />
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <StatRow label="Active Pipeline" value={`${candidates.length}`} />
+            <StatRow label="Review Pending" value={`${candidates.filter((c) => !c.phase1Scores).length}`} />
           </div>
 
           {isAdmin && activePosition && (
@@ -122,8 +129,49 @@ function CandidatesPage() {
             </div>
           )}
 
+          {/* Filter controls */}
+          <div className="sticky top-15 z-10 mb-6 bg-surface py-2">
+            <div className="flex items-center justify-between mb-3">
+              <p className="bp-label flex items-center gap-2"><Filter className="h-3 w-3" /> Filter Candidates</p>
+              {filter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setFilter("all")}
+                  className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-ink bp-press"
+                >
+                  <X className="h-3 w-3" /> Clear
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-ink/20">
+              {[
+                { value: "all", label: "All" },
+                { value: "pending", label: "Pending" },
+                { value: "evaluated", label: "Evaluated" },
+                { value: "phase2", label: "Phase 2" },
+                { value: "disqualified", label: "Disqualified" },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setFilter(f.value as any)}
+                  className={`shrink-0 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest border-2 bp-press ${
+                    filter === f.value
+                      ? "border-ink bg-ink text-surface"
+                      : "border-ink/40 bg-surface text-ink hover:border-ink"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 bp-meta text-[11px]">
+              Showing {filteredCandidates.length} of {candidates.length} candidates
+            </p>
+          </div>
+
           <div className="space-y-5">
-            {candidates.map((c, index) => (
+            {filteredCandidates.map((c, index) => (
               <CandidateCard
                 key={c.id}
                 c={c}
@@ -156,9 +204,9 @@ function CandidatesPage() {
 
 function StatRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className={"bp-card flex items-center justify-between px-4 py-3 " + (emphasis ? "bg-ink text-surface" : "")}>
-      <span className={"bp-label " + (emphasis ? "text-surface" : "")}>{label}</span>
-      <span className="font-display text-lg font-extrabold">{value}</span>
+    <div className={"bp-card flex items-center justify-between px-3 py-2 " + (emphasis ? "bg-ink text-surface" : "")}>
+      <span className={"bp-label text-[10px] " + (emphasis ? "text-surface" : "")}>{label}</span>
+      <span className="font-display text-base font-extrabold">{value}</span>
     </div>
   );
 }
@@ -184,77 +232,150 @@ function CandidateCard({
 }) {
   const selected = c.promoted || c.status === "phase2";
 
+  // Determine primary action
+  const getPrimaryAction = () => {
+    if (c.disqualified) {
+      return (
+        <div className="border-2 border-dashed border-alert/50 bg-alert/5 px-3 py-2 text-center">
+          <p className="font-mono text-[10px] uppercase text-alert">Disqualified</p>
+        </div>
+      );
+    }
+    if (c.phase2Complete) {
+      return (
+        <Link to="/evaluation/phase2/$id" params={{ id: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
+          View Phase 2 Review
+        </Link>
+      );
+    }
+    if (c.promotedToPhase2) {
+      return (
+        <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
+          Start Phase 2
+        </Link>
+      );
+    }
+    if (c.phase1Complete) {
+      return (
+        <Link to="/evaluation/phase1/$id" params={{ id: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
+          View Phase 1 Review
+        </Link>
+      );
+    }
+    return (
+      <Link to="/phase1" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink px-3 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-surface bp-press">
+        Start Phase 1
+      </Link>
+    );
+  };
+
   return (
-    <article 
-      className="bp-card-shadow bp-fade-up"
+    <article
+      className={`bp-card-shadow bp-fade-up ${c.disqualified ? "opacity-60" : ""}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <header className="flex items-center justify-between border-b-2 border-ink bg-ink px-3 py-2 text-surface">
-        <span className="font-mono text-[11px] tracking-widest">RANK // #{c.rank.toString().padStart(2, "0")}</span>
-        {selected ? (
-          <span className="font-mono text-[10px] tracking-widest">SELECTED FOR INTERVIEW</span>
-        ) : (
-          <span className="flex items-center gap-1 font-mono text-[10px] tracking-widest"><Clock className="h-3 w-3" /> AWAITING REVIEW</span>
-        )}
-      </header>
-
-      <div className="p-4">
-        <div className="relative mx-auto w-fit">
-          <PortraitSilhouette kind={c.silhouette} />
-          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-ink px-2 py-0.5 font-mono text-[10px] tracking-widest text-surface">{c.code}</span>
+      <div className="flex items-start gap-3 p-4">
+        {/* Compact silhouette */}
+        <div className="relative shrink-0">
+          <PortraitSilhouette kind={c.silhouette} className="h-16 w-16" />
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-ink px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-surface">{c.code}</span>
         </div>
 
-        <h3 className="mt-5 font-display text-2xl font-extrabold tracking-tight uppercase">{c.name}</h3>
-        <p className="mt-1 font-mono text-[12px] text-muted-foreground">Current: {c.currentRole}</p>
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="font-display text-lg font-extrabold tracking-tight uppercase truncate">{c.name}</h3>
+              <p className="font-mono text-[11px] text-muted-foreground truncate">{c.currentRole}</p>
+            </div>
+            <span className={`shrink-0 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+              c.disqualified ? "bg-alert text-surface" : selected ? "bg-ink text-surface" : "bg-surface-dim text-ink border border-ink"
+            }`}>
+              #{c.rank}
+            </span>
+          </div>
 
-        {canViewScores ? (
-          <>
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              className="mt-4 flex w-full items-center justify-center gap-2 border-2 border-dashed border-ink py-2 font-mono text-[10px] uppercase tracking-widest bp-press"
-            >
-              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              {isExpanded ? "Hide Details" : "View Detailed Scores"}
-            </button>
-            
-            {isExpanded && (
+          {/* Status indicator */}
+          <div className="mt-2 flex items-center gap-2 text-[10px]">
+            {c.disqualified ? (
+              <span className="text-alert font-medium">Disqualified</span>
+            ) : selected ? (
+              <span className="text-ink font-medium">Selected for Interview</span>
+            ) : c.phase1Complete ? (
+              <span className="text-muted-foreground">Phase 1 Complete</span>
+            ) : (
+              <span className="flex items-center gap-1 text-muted-foreground"><Clock className="h-3 w-3" /> Awaiting Review</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Primary action */}
+      <div className="px-4 pb-3">
+        {getPrimaryAction()}
+      </div>
+
+      {/* Expandable section */}
+      <div className="border-t-2 border-ink/20">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="flex w-full items-center justify-center gap-2 px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground hover:bg-surface-dim bp-press"
+        >
+          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          {isExpanded ? "Show Less" : "More Options"}
+        </button>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 space-y-3">
+            {/* All phase actions */}
+            {!c.disqualified && (
+              <div className="space-y-2">
+                {!c.phase1Complete && (
+                  <Link to="/phase1" search={{ candidateId: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
+                    Start Phase 1
+                  </Link>
+                )}
+                {c.phase1Complete && (
+                  <Link to="/evaluation/phase1/$id" params={{ id: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
+                    View Phase 1 Review
+                  </Link>
+                )}
+                {c.phase1Complete && c.promotedToPhase2 && (
+                  <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
+                    Start Phase 2
+                  </Link>
+                )}
+                {c.phase1Complete && !c.promotedToPhase2 && (
+                  <div className="border-2 border-dashed border-ink/30 py-2 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Awaiting Phase 2 Selection
+                  </div>
+                )}
+                {c.phase2Complete && (
+                  <Link to="/evaluation/phase2/$id" params={{ id: c.id }} className="block border-2 border-ink/40 py-2 text-center font-mono text-[10px] uppercase tracking-widest bp-press">
+                    View Phase 2 Review
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Disqualification reason */}
+            {c.disqualified && c.disqualifiedReason && (
+              <div className="border-2 border-dashed border-alert/30 bg-alert/5 p-3">
+                <p className="font-mono text-[10px] uppercase text-alert mb-1">Reason</p>
+                <p className="text-[12px] text-muted-foreground">{c.disqualifiedReason}</p>
+              </div>
+            )}
+
+            {/* Detailed scores */}
+            {canViewScores && !c.disqualified && (
               <DetailedScores candidate={c} position={position} />
             )}
-          </>
-        ) : (
-          <p className="mt-4 bp-meta text-muted-foreground">Scores locked — awaiting admin consent</p>
-        )}
 
-        <div className="mt-5 space-y-2">
-          {c.phase1Complete ? (
-            <Link to="/evaluation/phase1/$id" params={{ id: c.id }} className="block border-2 border-ink bg-ink py-3 text-center font-mono text-[11px] tracking-widest uppercase text-surface bp-press">
-              View Phase 1 Review
-            </Link>
-          ) : (
-            <Link to="/phase1" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink py-3 text-center font-mono text-[11px] tracking-widest uppercase text-surface bp-press">
-              Start Phase 1
-            </Link>
-          )}
-          
-          {c.phase1Complete && c.promotedToPhase2 ? (
-            <Link to="/phase2" search={{ candidateId: c.id }} className="block border-2 border-ink bg-ink py-3 text-center font-mono text-[11px] tracking-widest uppercase text-surface bp-press">
-              Start Phase 2
-            </Link>
-          ) : c.phase1Complete && !c.promotedToPhase2 ? (
-            <div className="border-2 border-dashed border-ink/40 py-3 text-center font-mono text-[11px] tracking-widest uppercase text-muted-foreground">
-              Awaiting Phase 2 Selection
-            </div>
-          ) : null}
-          
-          {c.phase2Complete && (
-            <Link to="/evaluation/phase2/$id" params={{ id: c.id }} className="block border-2 border-ink bg-ink py-3 text-center font-mono text-[11px] tracking-widest uppercase text-surface bp-press">
-              View Phase 2 Review
-            </Link>
-          )}
-          
-          {isAdmin && <AdminCandidateActions candidate={c} onSaved={onSaved} />}
-        </div>
+            {/* Admin actions */}
+            {isAdmin && <AdminCandidateActions candidate={c} onSaved={onSaved} />}
+          </div>
+        )}
       </div>
     </article>
   );

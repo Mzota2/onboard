@@ -42,6 +42,27 @@ function Phase2EvalPage() {
 
   const canView = isAdmin || activePosition?.phase2ConsentReleased;
 
+  // Prevent viewing evaluations for disqualified candidates
+  if (candidate?.disqualified) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label text-alert">Candidate Disqualified</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            {candidate.name} has been disqualified and cannot be evaluated.
+            {candidate.disqualifiedReason && ` Reason: ${candidate.disqualifiedReason}`}
+          </p>
+          <Link
+            to="/"
+            className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
+          >
+            Return to Pipeline
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (isLoading) {
     return (
       <AppShell>

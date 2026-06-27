@@ -127,6 +127,9 @@ export interface Candidate {
   promotionMethod: "manual" | "automatic" | null;
   rank: number;
   aggregateScore: number;
+  disqualified: boolean;
+  disqualifiedAt?: string;
+  disqualifiedReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -161,7 +164,7 @@ export type UpdatePositionInput = Partial<
 >;
 
 export type UpdateCandidateInput = Partial<
-  Pick<Candidate, "name" | "code" | "currentRole" | "silhouette" | "status" | "promotedToPhase2" | "promotionMethod">
+  Pick<Candidate, "name" | "code" | "currentRole" | "silhouette" | "status" | "promotedToPhase2" | "promotionMethod" | "disqualified" | "disqualifiedAt" | "disqualifiedReason">
 >;
 
 export type CreateCandidateInput = {

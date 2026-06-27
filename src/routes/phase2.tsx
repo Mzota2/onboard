@@ -91,6 +91,50 @@ function Phase2Page() {
 
   const candidate = candidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.promoted);
 
+  // Prevent evaluation of disqualified candidates
+  if (candidate?.disqualified) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label text-alert">Candidate Disqualified</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            {candidate.name} has been disqualified and cannot be evaluated.
+            {candidate.disqualifiedReason && ` Reason: ${candidate.disqualifiedReason}`}
+          </p>
+          <Link
+            to="/"
+            className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
+          >
+            Return to Pipeline
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Prevent evaluation if Phase 2 results are released (unless admin)
+  if (activePosition?.phase2ConsentReleased && !isAdmin) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="bp-label">Phase 2 Results Released</p>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            Phase 2 results have been released to interviewers. Evaluation is now closed.
+          </p>
+          {candidateId ? (
+            <Link
+              to="/evaluation/phase2/$id"
+              params={{ id: candidateId }}
+              className="mt-4 border-2 border-ink bg-ink px-4 py-3 text-surface bp-press"
+            >
+              View Results
+            </Link>
+          ) : null}
+        </div>
+      </AppShell>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<"score" | "questions" | "review">("score");
 
 
