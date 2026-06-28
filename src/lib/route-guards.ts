@@ -7,9 +7,13 @@ import type { UserProfile } from "./firebase/types";
 import { canStartPhase2Review } from "./phase2-access";
 
 export async function requireAuth(): Promise<UserProfile> {
-  // Wait for Firebase Auth to initialize and restore session
+  // Auth state is unavailable during SSR — defer the check to the client.
+  if (typeof window === "undefined") {
+    return null as unknown as UserProfile;
+  }
+
   await waitForFirebaseAuth();
-  
+
   const { profile } = await waitForAuthInit();
   if (!profile) {
     throw redirect({ to: "/login" });
@@ -18,9 +22,12 @@ export async function requireAuth(): Promise<UserProfile> {
 }
 
 export async function requireGuest(): Promise<void> {
-  // Wait for Firebase Auth to initialize and restore session
+  if (typeof window === "undefined") {
+    return;
+  }
+
   await waitForFirebaseAuth();
-  
+
   const { profile } = await waitForAuthInit();
   if (profile) {
     throw redirect({ to: "/" });

@@ -75,6 +75,20 @@ export async function getInterviewerEvaluation(
   return mapEvaluation(snap.docs[0].id, snap.docs[0].data());
 }
 
+export async function listInterviewerEvaluations(
+  interviewerId: string,
+  phase: "phase1" | "phase2",
+): Promise<Evaluation[]> {
+  if (!db) return [];
+  const q = query(
+    collection(db, COLLECTION),
+    where("interviewerId", "==", interviewerId),
+    where("phase", "==", phase),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => mapEvaluation(d.id, d.data()));
+}
+
 export async function createEvaluation(input: {
   candidateId: string;
   positionId: string;
@@ -83,6 +97,15 @@ export async function createEvaluation(input: {
   phase: "phase1" | "phase2";
 }): Promise<Evaluation> {
   if (!db) throw new Error("Firebase is not configured.");
+
+  const existingEvaluation = await getInterviewerEvaluation(
+    input.candidateId,
+    input.interviewerId,
+    input.phase,
+  );
+  if (existingEvaluation) {
+    return existingEvaluation;
+  }
 
   const payload = {
     candidateId: input.candidateId,

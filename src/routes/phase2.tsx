@@ -16,11 +16,17 @@ import { useCandidates, usePositions } from "@/hooks/use-vetting-data";
 
 import { updateCandidatePhase2Scores } from "@/lib/firebase/candidates";
 
-import { createEvaluation, saveQuestionEvaluation, completeEvaluation } from "@/lib/firebase/evaluations";
+import {
+  createEvaluation,
+  saveQuestionEvaluation,
+  completeEvaluation,
+  getInterviewerEvaluation,
+  listInterviewerEvaluations,
+} from "@/lib/firebase/evaluations";
 
 import { requireAuth, requirePhase2Access } from "@/lib/route-guards";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { toast } from "sonner";
 
@@ -91,8 +97,19 @@ function Phase2Page() {
 
   const { data: candidates = [] } = useCandidates(activePosition?.id);
 
+  const { data: interviewerEvaluations = [] } = useQuery({
+    queryKey: ["interviewer-evaluations", profile?.uid, "phase2"],
+    queryFn: async () => {
+      if (!profile?.uid) return [];
+      return listInterviewerEvaluations(profile.uid, "phase2");
+    },
+    enabled: !!profile?.uid,
+  });
+
+  const evaluatedCandidateIds = new Set(interviewerEvaluations.map((evaluation) => evaluation.candidateId));
+
   const eligibleCandidates = [...candidates]
-    .filter((candidateItem) => !candidateItem.disqualified && candidateItem.promotedToPhase2)
+    .filter((candidateItem) => !candidateItem.disqualified && candidateItem.promotedToPhase2 && !evaluatedCandidateIds.has(candidateItem.id))
     .sort((a, b) => a.rank - b.rank || b.aggregateScore - a.aggregateScore);
 
   const candidate = eligibleCandidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.promoted);
@@ -163,7 +180,18 @@ function Phase2Page() {
 
   const [activeTab, setActiveTab] = useState<"score" | "questions" | "review">("score");
 
+  const { data: existingEvaluation, isLoading: isLoadingExistingEvaluation } = useQuery({
+    queryKey: ["interviewer-evaluation", candidate?.id, profile?.uid, "phase2"],
+    queryFn: async () => {
+      if (!candidate?.id || !profile?.uid) return null;
+      const result = await getInterviewerEvaluation(candidate.id, profile.uid, "phase2");
+      console.debug("Phase2 firestore evaluation fetched", { candidateId: candidate.id, interviewerId: profile.uid, result });
+      return result;
+    },
+    enabled: !!candidate?.id && !!profile?.uid,
+  });
 
+  const [existingEvaluationHydrated, setExistingEvaluationHydrated] = useState(false);
 
   const draftKey = useMemo(() => getEvaluationDraftKey({
     phase: "phase2",
@@ -221,6 +249,58 @@ function Phase2Page() {
   }, [candidate?.id, draftKey]);
 
   useEffect(() => {
+    if (!candidate || isLoadingExistingEvaluation || !existingEvaluation || existingEvaluationHydrated) return;
+    if (phase2Questions.length === 0) return;
+
+    const nextQuestion = existingEvaluation.isComplete
+      ? 1
+      : Math.max(1, Math.min(existingEvaluation.lastQuestionIndex + 1, phase2Questions.length));
+
+    const hydratedQuestionScores = Object.fromEntries(
+      Object.entries(existingEvaluation.questionScores ?? {}).map(([questionId, questionScore]) => {
+        const storedCriteria = questionScore?.criteria ?? {};
+        const criteriaRatings = typeof storedCriteria.criteria === "object"
+          ? storedCriteria.criteria
+          : storedCriteria;
+        return [questionId, {
+          criteria: criteriaRatings || {},
+          notes: storedCriteria?.notes ?? "",
+        }];
+      }),
+    ) as Record<string, { criteria: Record<string, number>; notes: string }>;
+
+    console.debug("Phase2 hydratedQuestionScores", {
+      existingQuestionScores: existingEvaluation.questionScores,
+      hydratedQuestionScores,
+      nextQuestion,
+      nextQuestionId: phase2Questions[nextQuestion - 1]?.id,
+      savedScore: hydratedQuestionScores[phase2Questions[nextQuestion - 1]?.id],
+    });
+
+    setQuestionScores(hydratedQuestionScores);
+    setNotes(existingEvaluation.notes ?? "");
+    setActive(nextQuestion);
+    setActiveTab("score");
+
+    const savedScore = hydratedQuestionScores[phase2Questions[nextQuestion - 1]?.id];
+    setRatings(savedScore?.criteria || {});
+    setExistingEvaluationHydrated(true);
+  }, [candidate?.id, draftKey, existingEvaluation, existingEvaluationHydrated, isLoadingExistingEvaluation, phase2Questions.length]);
+
+  useEffect(() => {
+    if (!question?.id) return;
+    const savedScore = questionScores[question.id];
+    if (!savedScore) {
+      setRatings({});
+      setNotes("");
+      return;
+    }
+
+    setRatings(savedScore.criteria);
+    setNotes(savedScore.notes || "");
+  }, [question?.id, questionScores]);
+
+  useEffect(() => {
     if (!draftKey || !candidate) return;
 
     const payload = {
@@ -260,12 +340,15 @@ function Phase2Page() {
 
   const criteria = scenario?.criteria || [];
 
+  const currentRatings = Object.keys(ratings).length > 0 ? ratings : questionScores[question.id]?.criteria || {};
+  const currentNotes = notes || questionScores[question.id]?.notes || "";
+
   // Check if current question is ready to proceed
-  const canProceed = criteria.length > 0 && criteria.every(c => ratings[c.id] && ratings[c.id] > 0);
+  const canProceed = criteria.length > 0 && criteria.every(c => currentRatings[c.id] && currentRatings[c.id] > 0);
 
   // Validate current question before proceeding
   const validateCurrentQuestion = () => {
-    const unratedCriteria = criteria.filter(c => !ratings[c.id] || ratings[c.id] === 0);
+    const unratedCriteria = criteria.filter(c => !currentRatings[c.id] || currentRatings[c.id] === 0);
     if (unratedCriteria.length > 0) {
       toast.error("Please rate all criteria before proceeding");
       return false;
@@ -278,8 +361,8 @@ function Phase2Page() {
     setQuestionScores(prev => ({
       ...prev,
       [question.id]: {
-        criteria: { ...ratings },
-        notes,
+        criteria: { ...currentRatings },
+        notes: currentNotes,
       },
     }));
   };
@@ -291,10 +374,13 @@ function Phase2Page() {
     saveCurrentQuestionToState();
 
     if (active < phase2Questions.length) {
+      const nextQuestionId = phase2Questions[active]?.id;
+      const nextSavedScore = questionScores[nextQuestionId];
+
       setAnimationDirection('forward');
       setActive(active + 1);
-      setRatings({});
-      setNotes("");
+      setRatings(nextSavedScore?.criteria || {});
+      setNotes(nextSavedScore?.notes || "");
     }
   };
 
@@ -306,19 +392,13 @@ function Phase2Page() {
         saveCurrentQuestionToState();
       }
       
-      setAnimationDirection('backward');
-      setActive(active - 1);
-      
-      // Load saved data for previous question
       const prevQuestion = phase2Questions[active - 2];
       const savedScore = questionScores[prevQuestion.id];
-      if (savedScore) {
-        setRatings(savedScore.criteria);
-        setNotes(savedScore.notes);
-      } else {
-        setRatings({});
-        setNotes("");
-      }
+
+      setAnimationDirection('backward');
+      setActive(active - 1);
+      setRatings(savedScore?.criteria || {});
+      setNotes(savedScore?.notes || "");
     }
   };
 
@@ -336,13 +416,8 @@ function Phase2Page() {
     // Load saved data for target question
     const targetQuestion = phase2Questions[index];
     const savedScore = questionScores[targetQuestion.id];
-    if (savedScore) {
-      setRatings(savedScore.criteria);
-      setNotes(savedScore.notes);
-    } else {
-      setRatings({});
-      setNotes("");
-    }
+    setRatings(savedScore?.criteria || {});
+    setNotes(savedScore?.notes || "");
   };
 
   // const questionNav: readonly (number | "...")[] =
@@ -396,7 +471,7 @@ function Phase2Page() {
     setSubmissionProgress("Creating evaluation...");
 
     try {
-      const evaluation = await createEvaluation({
+      const evaluation = existingEvaluation ?? await createEvaluation({
         candidateId: candidate.id,
         positionId: activePosition?.id || "",
         interviewerId: profile.uid,
@@ -794,7 +869,7 @@ function Phase2Page() {
 
                               className="bp-rating"
 
-                              data-active={ratings[c.id] === n}
+                              data-active={currentRatings[c.id] === n}
 
                             >
 

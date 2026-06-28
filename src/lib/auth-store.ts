@@ -38,14 +38,9 @@ export function waitForAuthInit(): Promise<AuthState> {
   if (state.initialized) return Promise.resolve(state);
 
   // Firebase auth only initializes in the browser (see firebase/config.ts).
-  // Route beforeLoad guards run during SSR too — never block waiting for the client.
+  // Route guards skip auth checks during SSR; never treat SSR as signed-out here.
   if (typeof window === "undefined") {
-    return Promise.resolve({
-      firebaseUser: null,
-      profile: null,
-      loading: false,
-      initialized: true,
-    });
+    return new Promise(() => {});
   }
 
   return new Promise((resolve) => {

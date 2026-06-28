@@ -1,6 +1,15 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged, type Auth } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  onAuthStateChanged,
+  type Auth,
+  type User,
+} from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { setAuthState } from "../auth-store";
+import { getUserProfile } from "./users";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,59 +35,108 @@ let db: Firestore | undefined;
 let authInitialized = false;
 let authInitPromise: Promise<void> | null = null;
 
+async function applyAuthUser(user: User | null): Promise<void> {
+  if (!user) {
+    setAuthState({
+      firebaseUser: null,
+      profile: null,
+      loading: false,
+      initialized: true,
+    });
+    return;
+  }
+
+  setAuthState({
+    firebaseUser: user,
+    profile: null,
+    loading: true,
+    initialized: false,
+  });
+
+  const profile = await getUserProfile(user.uid);
+  setAuthState({
+    firebaseUser: user,
+    profile,
+    loading: false,
+    initialized: true,
+  });
+}
+
+function bootstrapAuthListener(authInstance: Auth): Promise<void> {
+  return new Promise((resolve) => {
+    let bootstrapped = false;
+    let pendingNullTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finishBootstrap = () => {
+      if (bootstrapped) return;
+      bootstrapped = true;
+      authInitialized = true;
+      resolve();
+    };
+
+    onAuthStateChanged(authInstance, (user) => {
+      const commit = (resolvedUser: User | null) => {
+        void applyAuthUser(resolvedUser);
+        finishBootstrap();
+      };
+
+      if (user) {
+        if (pendingNullTimer) {
+          clearTimeout(pendingNullTimer);
+          pendingNullTimer = null;
+        }
+        commit(user);
+        return;
+      }
+
+      if (bootstrapped) {
+        commit(null);
+        return;
+      }
+
+      if (pendingNullTimer) clearTimeout(pendingNullTimer);
+      pendingNullTimer = setTimeout(() => commit(authInstance.currentUser), 600);
+    });
+
+    window.setTimeout(() => {
+      if (!bootstrapped) {
+        void applyAuthUser(authInstance.currentUser);
+        finishBootstrap();
+      }
+    }, 2000);
+  });
+}
+
 if (typeof window !== "undefined" && isFirebaseConfigured()) {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  
-  // Set auth persistence to LOCAL (uses secure browser storage)
+
   authInitPromise = setPersistence(auth, browserLocalPersistence)
-    .then(() => {
-      // Wait for auth to initialize and restore the persisted session before
-      // allowing route guards to decide whether the user is signed in.
-      return new Promise<void>((resolve) => {
-        if (!auth) {
-          authInitialized = true;
-          resolve();
-          return;
-        }
-
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          authInitialized = true;
-          resolve();
-        };
-
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          if (user) {
-            unsubscribe();
-            finish();
-            return;
-          }
-
-          // A transient null event can happen while Firebase is restoring the
-          // persisted session. Wait briefly before treating the user as signed out.
-          const fallback = window.setTimeout(() => {
-            unsubscribe();
-            finish();
-          }, 600);
-
-          return () => window.clearTimeout(fallback);
-        });
-
-        window.setTimeout(() => {
-          if (!settled) {
-            finish();
-          }
-        }, 1000);
-      });
+    .then(async () => {
+      if (!auth) {
+        authInitialized = true;
+        return;
+      }
+      await bootstrapAuthListener(auth);
     })
     .catch((error) => {
       console.error("Failed to set auth persistence:", error);
       authInitialized = true;
+      setAuthState({
+        firebaseUser: null,
+        profile: null,
+        loading: false,
+        initialized: true,
+      });
     });
+} else if (typeof window !== "undefined") {
+  setAuthState({
+    firebaseUser: null,
+    profile: null,
+    loading: false,
+    initialized: true,
+  });
 }
 
 export function waitForFirebaseAuth(): Promise<void> {

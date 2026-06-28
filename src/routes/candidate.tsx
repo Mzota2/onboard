@@ -96,7 +96,7 @@ function CandidatesPage() {
     <AppShell>
       <div className="mb-4 bp-fade-up">
         <div className="flex items-baseline gap-3">
-          <h1 className="font-display text-[26px] leading-[1] font-extrabold tracking-tight uppercase">
+          <h1 className="font-display text-[26px] leading-none font-extrabold tracking-tight uppercase">
             {activePosition?.title ?? "Candidates"}
           </h1>
           {activePosition && (
@@ -465,6 +465,16 @@ function DetailedScores({ candidate, position }: { candidate: Candidate; positio
     return result;
   };
 
+  function fmtScore(v: any) {
+    if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+    return v.toFixed(1);
+  }
+
+  function fmtRawScore(v: any) {
+    if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+    return `${v.toFixed(6)} raw`;
+ }
+
   const p1Criteria = aggregateCriteriaScores(phase1Evaluations);
   const p2Criteria = aggregateCriteriaScores(phase2Evaluations);
 
@@ -484,7 +494,7 @@ function DetailedScores({ candidate, position }: { candidate: Candidate; positio
                 const p1Score = p1Criteria?.[criterion.id];
                 const p2Score = p2Criteria?.[criterion.id];
                 
-                if (!p1Score && !p2Score) return null;
+                if ((p1Score === null || p1Score === undefined) && (p2Score === null || p2Score === undefined)) return null;
                 
                 return (
                   <div key={criterion.id} className="flex items-center justify-between text-[12px]">
@@ -493,16 +503,20 @@ function DetailedScores({ candidate, position }: { candidate: Candidate; positio
                       <p className="bp-meta text-[10px]">{criterion.description}</p>
                     </div>
                     <div className="flex gap-4">
-                      {p1Score && (
+                      {p1Score !== null && p1Score !== undefined && (
                         <div className="text-center">
                           <p className="bp-meta text-[10px]">P1</p>
-                          <p className="font-mono font-bold">{p1Score}/{criterion.scale}</p>
+                          <p className="font-mono font-bold" title={fmtRawScore(p1Score)}>
+                            {fmtScore(p1Score)}/{criterion.scale}
+                          </p>
                         </div>
                       )}
-                      {p2Score && (
+                      {p2Score !== null && p2Score !== undefined && (
                         <div className="text-center">
                           <p className="bp-meta text-[10px]">P2</p>
-                          <p className="font-mono font-bold">{p2Score}/{criterion.scale}</p>
+                          <p className="font-mono font-bold" title={fmtRawScore(p2Score)}>
+                            {fmtScore(p2Score)}/{criterion.scale}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -520,31 +534,43 @@ function DetailedScores({ candidate, position }: { candidate: Candidate; positio
           <p className="font-display text-sm font-bold">Technical Depth</p>
           <div className="flex justify-between text-[12px]">
             <span>Phase 1</span>
-            <span className="font-mono">{p1Criteria?.technicalDepth || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p1Criteria?.technicalDepth)}>
+              {p1Criteria?.technicalDepth !== undefined ? fmtScore(p1Criteria.technicalDepth) : "—"}/5
+            </span>
           </div>
           <div className="flex justify-between text-[12px]">
             <span>Phase 2</span>
-            <span className="font-mono">{p2Criteria?.technicalDepth || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p2Criteria?.technicalDepth)}>
+              {p2Criteria?.technicalDepth !== undefined ? fmtScore(p2Criteria.technicalDepth) : "—"}/5
+            </span>
           </div>
           
           <p className="font-display text-sm font-bold mt-3">Clarity</p>
           <div className="flex justify-between text-[12px]">
             <span>Phase 1</span>
-            <span className="font-mono">{p1Criteria?.clarity || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p1Criteria?.clarity)}>
+              {p1Criteria?.clarity !== undefined ? fmtScore(p1Criteria.clarity) : "—"}/5
+            </span>
           </div>
           <div className="flex justify-between text-[12px]">
             <span>Phase 2</span>
-            <span className="font-mono">{p2Criteria?.clarity || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p2Criteria?.clarity)}>
+              {p2Criteria?.clarity !== undefined ? fmtScore(p2Criteria.clarity) : "—"}/5
+            </span>
           </div>
           
           <p className="font-display text-sm font-bold mt-3">Impact</p>
           <div className="flex justify-between text-[12px]">
             <span>Phase 1</span>
-            <span className="font-mono">{p1Criteria?.impact || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p1Criteria?.impact)}>
+              {p1Criteria?.impact !== undefined ? fmtScore(p1Criteria.impact) : "—"}/5
+            </span>
           </div>
           <div className="flex justify-between text-[12px]">
             <span>Phase 2</span>
-            <span className="font-mono">{p2Criteria?.impact || "—"}/5</span>
+            <span className="font-mono" title={fmtRawScore(p2Criteria?.impact)}>
+              {p2Criteria?.impact !== undefined ? fmtScore(p2Criteria.impact) : "—"}/5
+            </span>
           </div>
         </div>
       ) : null}

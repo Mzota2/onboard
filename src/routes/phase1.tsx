@@ -14,11 +14,17 @@ import { useCandidates, usePositions } from "@/hooks/use-vetting-data";
 
 import { createCandidate, updateCandidatePhase1Scores } from "@/lib/firebase/candidates";
 
-import { createEvaluation, saveQuestionEvaluation, completeEvaluation } from "@/lib/firebase/evaluations";
+import {
+  createEvaluation,
+  saveQuestionEvaluation,
+  completeEvaluation,
+  getInterviewerEvaluation,
+  listInterviewerEvaluations,
+} from "@/lib/firebase/evaluations";
 
 import { requireAuth } from "@/lib/route-guards";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { toast } from "sonner";
 
@@ -75,11 +81,31 @@ function Phase1Page() {
 
   const { data: candidates = [] } = useCandidates(activePosition?.id);
 
+  const { data: interviewerEvaluations = [] } = useQuery({
+    queryKey: ["interviewer-evaluations", profile?.uid, "phase1"],
+    queryFn: async () => {
+      if (!profile?.uid) return [];
+      return listInterviewerEvaluations(profile.uid, "phase1");
+    },
+    enabled: !!profile?.uid,
+  });
+
+  const evaluatedCandidateIds = new Set(interviewerEvaluations.map((evaluation) => evaluation.candidateId));
+
   const eligibleCandidates = [...candidates]
-    .filter((candidateItem) => !candidateItem.disqualified)
+    .filter((candidateItem) => !candidateItem.disqualified && !evaluatedCandidateIds.has(candidateItem.id))
     .sort((a, b) => a.rank - b.rank || b.aggregateScore - a.aggregateScore);
 
   const candidate = eligibleCandidates.find((c) => c.id === candidateId) ?? candidates.find((c) => c.id === candidateId);
+
+  const { data: existingEvaluation } = useQuery({
+    queryKey: ["interviewer-evaluation", candidate?.id, profile?.uid, "phase1"],
+    queryFn: async () => {
+      if (!candidate?.id || !profile?.uid) return null;
+      return getInterviewerEvaluation(candidate.id, profile.uid, "phase1");
+    },
+    enabled: !!candidate?.id && !!profile?.uid,
+  });
 
   // Prevent evaluation of disqualified candidates
   if (candidate?.disqualified) {
@@ -395,7 +421,7 @@ function Phase1Page() {
     setSubmitting(true);
     setSubmissionProgress("Creating evaluation...");
     try {
-      const evaluation = await createEvaluation({
+      const evaluation = existingEvaluation ?? await createEvaluation({
         candidateId: candidate.id,
         positionId: activePosition?.id || "",
         interviewerId: profile.uid,
